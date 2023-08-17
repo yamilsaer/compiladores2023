@@ -9,6 +9,12 @@ Para correr el proyecto basta con ejecutar:
 cabal run
 ```
 
+o cargar en el entorno interactivo GHCi los módulos del proyecto:
+
+```code
+cabal repl
+```
+
 Las opciones soportadas por el intérprete pueden verse utilizando el comando `:help` :
 ```code
 FD4> :help
