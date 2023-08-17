@@ -3,41 +3,25 @@ Código para la materia Compiladores 2023 de [LCC](https://dcc.fceia.unr.edu.ar)
 
 Este es el código a partir del cual los estudiantes empiezan a desarrollar un compilador.
 
-Para fijar la versión de GHC y de los paquetes usaremos la herramienta [stack](https://docs.haskellstack.org/en/stable/README/).
-
-Los pasos para instalar son:
+Para correr el proyecto basta con ejecutar:
 
 ```code
-stack setup
-stack build
+cabal run
 ```
 
-Luego se puede ejecutar con 
+Las opciones soportadas por el intérprete pueden verse utilizando el comando `:help` :
 ```code
-stack run
-```
-o cargar el entorno interactivo GHCi
-```code
-stack ghci
+FD4> :help
+Lista de comandos:  Cualquier comando puede ser abreviado a :c donde
+c es el primer caracter del nombre completo.
 
-stack ghci src/TypeChecker.hs
-```
-
-También se pueden cargar archivos. Desde stack:
-```code
-stack run -- miprograma.fd4
-```
-
-En general, los argumentos a nuestro programa se escriben luego de `--`. Por ejemplo,
-```code
-% stack run -- --help
-Compilador de FD4 de la materia Compiladores 2022
-
-Usage: compiladores-exe [(-t|--typecheck) | (-i|--interactive)] [FILES...]
-  Compilador de FD4
-
-Available options:
-  -t,--typecheck           Solo chequear tipos
-  -i,--interactive         Ejecutar en forma interactiva
-  -h,--help                Show this help text
+<expr>                  evaluar la expresión
+let <var> = <expr>      definir una variable
+:browse                 Ver los nombres en scope
+:load <file>            Cargar un programa desde un archivo
+:print <exp>            Imprime un término y sus ASTs sin evaluarlo
+:reload                 Vuelve a cargar el último archivo cargado
+:type <exp>             Chequea el tipo de una expresión
+:quit, :Q               Salir del intérprete
+:help, :?               Mostrar esta lista de comandos
 ```
