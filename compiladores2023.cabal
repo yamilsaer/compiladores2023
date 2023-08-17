@@ -49,7 +49,7 @@ executable compiladores2023
         -fwarn-incomplete-patterns
     -- other-extensions:
     build-depends:    
-          base ^>=4.16.4.0
+          base >=4.7
         , binary
         , bytestring
         , exceptions
