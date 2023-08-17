@@ -3,19 +3,21 @@ Código para la materia Compiladores 2023 de [LCC](https://dcc.fceia.unr.edu.ar)
 
 Este es el código a partir del cual los estudiantes empiezan a desarrollar un compilador.
 
-Para correr el proyecto basta con ejecutar:
+Para correr el intérprete basta con ejecutar:
 
 ```code
 cabal run
 ```
 
-o cargar en el entorno interactivo GHCi los módulos del proyecto:
+También pueden cargar un módulo específico del proyecto en el entorno interactivo GHCi:
 
 ```code
-cabal repl
+cabal exec ghci
+
+cabal exec ghci src/Common.hs
 ```
 
-Las opciones soportadas por el intérprete pueden verse utilizando el comando `:help` :
+Las opciones soportadas por el intérprete de FD4 pueden verse utilizando el comando `:help` :
 ```code
 FD4> :help
 Lista de comandos:  Cualquier comando puede ser abreviado a :c donde
