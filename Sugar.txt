@@ -1,0 +1,23 @@
+a) 
+-------
+Lang.hs 
+--------
+Modificamos inicialmente SLet (agregamos bool)
+Agregamos en SLet,SLam y SFix para que puedan se puedan definir con multiples argumentos
+
+-------
+Parse.hs 
+--------
+Creamos binders y multibinders para poder permitir parsear varios argumentos, debido a las modificaciones anteriores
+multibinders es similar a binding pero toma varias variables
+binders hacemos many de multibinders y binding y juntamos la listas de listas de resultados y hacemos concat
+Modificamos fix, de acuerdo al punto anterior
+
+Creamos un letbinding, para parsear la funcion y sus elementos, con esta funcion la usamos en letexp. 
+Adicionalmente determinamos el booleano de acuerdo si hay rec o no
+
+-------
+Elab.hs
+--------
+Modificamos elab' para adaptarse a las modificaciones de los binders
+Tuvimos en cuenta el pdf para ver como hacer las recuersiones

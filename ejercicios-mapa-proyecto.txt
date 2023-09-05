@@ -1,0 +1,52 @@
+1) 
+    a)  Esta definido en Lang.hs
+
+    b)  Term representa los términos con índices de De Bruijn como variables ligadas, y nombres para libres y globales, guarda posición.
+        TTerm reprensenta los términos con índices de De Bruijn como variables ligadas, y nombres para libres y globales, guarda posición y tipo.
+
+2)
+    a)  Se comenta por linea usando el caracter '#'. Esto se puede cambiar en la funcion langDef en el modulo Parse, cambiando
+        el atributo commentLine del registro. Si se quisiera comentar por bloque, se deberia definir un string para comenzar el
+        comentario y otro para terminarlo, y luego definirlos en los atributos commentStart y commentEnd en el registro LanguageDef, respectivamente.
+    
+3)  Se usa try porque de ser una declaracion top-level no se necesita explicitar el tipo de la variable que se define, en cambio si es un termino
+    sí. Ademas el termino necesita el contexto sobre el cual trabaja la variable, osea un "in" seguido de un termino.
+
+4)  elab' lleva la lista de los nombres de las variables que va encontrando al recorrer el termino y tomar como variables libres a cada variable encontrada
+    que pertenezca a la lista. Luego, al cerrar los terminos se asigna correctamente su indice de scope.
+
+5)  Las funciones relevantes de las superclases de la monada MonadFD4 son:
+    - asks (MonadReader)
+    - modify (MonadState)
+    - gets (MonadState)
+    - get (MonadState)
+    - putStrLn (MonadIO)
+    - liftIO (MonadIO)
+    - throwError (MonadError)
+    - catchError (MonadError)
+
+6)  Si no se checkea que un nombre ya fue utilizado, entonces se puede dar esa condicion. Pero, como se construyen
+    usando los indices de De Bruijn, no se puede dar nunca este caso.(Consultar)
+
+7)  El modulo PPrint exporta las funciones:
+    - pp : Transforma un termino en un string para imprimir por pantalla.
+    - ppTy : Transforma un tipo en un string para imprimir por pantalla.
+    - ppName : Devuelve el nombre de una variable.
+    - ppDecl : Transforma una declaracion top-level en un string para imprimir por pantalla.
+
+8)  Para asegurarse de que no se encuentre libre utiliza una funcion freshen que te da un nombre nuevo que no se encuentre en el entorno.
+(Consultar)
+
+9)  Habria que modificar:
+    - Lang : Agregar el termino nuevo.
+    - Parse : Parsear con las palabras reservadas adecuadas.
+    - Eval : Para luego poder calcular.
+    - PPrint : Para poder imprimirlo por pantalla.
+    - TypeChecker : Para checkear los tipos del termino en si y sus subterminos.
+    - etc.
+
+10) - Se puede usar una monada con timers? (Preguntar)
+    
+11) - Se podria agregar un Bool en la definicion de terminos que indique si se imprime la informacion de debug o no.
+    - Se deberia imprimir en cada etapa a medida que se evalua o cuando finalizo todo el proceso? 
+    (Preguntar)

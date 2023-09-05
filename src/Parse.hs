@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use <$>" #-}
+{-# LANGUAGE TupleSections #-}
 {-|
 Module      : Parse
 Description : Define un parser de términos FD40 a términos fully named.
@@ -121,19 +122,32 @@ atom =     (flip SConst <$> const <*> getPos)
        <|> printOp
 
 -- parsea un par (variable : tipo)
-binding :: P (Name, Ty)
+binding :: P [(Name, Ty)]
 binding = do v <- var
              reservedOp ":"
              ty <- typeP
-             return (v, ty)
+             return [(v, ty)]
 
+-- parsea tipos (var1 var2 ... varn : tipo )
+multibinders :: P [(Name, Ty)]
+multibinders = do vs <- many1 var
+                  reservedOp ":"
+                  ty <- typeP
+                  return (map (,ty) vs)
+
+
+binders :: P [(Name, Ty)]
+binders = do bs <- many1 $ parens binding <|> parens multibinders
+             return $ concat bs
+
+-- (x y:Nat)(z: Nat->Nat)
 lam :: P STerm
 lam = do i <- getPos
          reserved "fun"
-         (v,ty) <- parens binding
+         bs <- binders
          reservedOp "->"
          t <- expr
-         return (SLam i (v,ty) t)
+         return (SLam i bs t)
 
 -- Nota el parser app también parsea un solo atom.
 app :: P STerm
@@ -155,22 +169,30 @@ ifz = do i <- getPos
 fix :: P STerm
 fix = do i <- getPos
          reserved "fix"
-         (f, fty) <- parens binding
-         (x, xty) <- parens binding
+         [(f, fty)] <- parens binding
+         bs <- binders
          reservedOp "->"
          t <- expr
-         return (SFix i (f,fty) (x,xty) t)
+         return (SFix i (f,fty) bs t)
+
+letbinding :: P [(Name, Ty)]
+letbinding = do v <- var
+                bs <- binders
+                reservedOp ":"
+                ty <- typeP
+                return $ (v, ty):bs
 
 letexp :: P STerm
 letexp = do
   i <- getPos
   reserved "let"
-  (v,ty) <- parens binding
+  isRec <- (do reserved "rec"; return True) <|> return False
+  bs <- if isRec then letbinding else letbinding <|> binding <|> parens binding
   reservedOp "="  
   def <- expr
   reserved "in"
   body <- expr
-  return (SLet i (v,ty) def body)
+  return (SLet isRec i bs def body)
 
 -- | Parser de términos
 tm :: P STerm
