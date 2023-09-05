@@ -36,6 +36,11 @@ data STm info ty var =
   | SLet Bool info [(var, ty)] (STm info ty var) (STm info ty var)
   deriving (Show, Functor)
 
+-- data STy var =
+--     SNatTy
+--   | SFunTy (STy var) (STy var)
+--   | SVarTy var
+
 -- | AST de Tipos
 data Ty =
       NatTy

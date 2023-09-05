@@ -32,7 +32,7 @@ import Prettyprinter
       nest,
       sep,
       parens,
-      list,
+      cat,
       Doc,
       Pretty(pretty) )
 import MonadFD4 ( gets, MonadFD4 )
@@ -132,7 +132,7 @@ t2doc at (SConst _ c) = c2doc c
 t2doc at (SLam _ vs t) =
   parenIf at $
   sep [sep [ keywordColor (pretty "fun")
-           , list $ map binding2doc vs
+           , cat $ map binding2doc vs
            , opColor(pretty "->")]
       , nest 2 (t2doc False t)]
 
@@ -145,7 +145,7 @@ t2doc at (SFix _ (f,fty) vs m) =
   parenIf at $
   sep [ sep [keywordColor (pretty "fix")
                   , binding2doc (f, fty)
-                  , list $ map binding2doc vs
+                  , cat $ map binding2doc vs
                   , opColor (pretty "->") ]
       , nest 2 (t2doc False m)
       ]
@@ -163,7 +163,7 @@ t2doc at (SLet _ _ vs t t') =
   parenIf at $
   sep [
     sep [keywordColor (pretty "let")
-       , list $ map binding2doc vs
+       , cat $ map binding2doc vs
        , opColor (pretty "=") ]
   , nest 2 (t2doc False t)
   , keywordColor (pretty "in")
