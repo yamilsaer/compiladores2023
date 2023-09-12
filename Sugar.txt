@@ -21,3 +21,12 @@ Elab.hs
 --------
 Modificamos elab' para adaptarse a las modificaciones de los binders
 Tuvimos en cuenta el pdf para ver como hacer las recuersiones
+
+
+-------------------------------------
+Preguntar :
+Como hacer bien el resugar.
+
+Como hacer biel el haber
+
+Y mostrar por arriba lo que hicimos
