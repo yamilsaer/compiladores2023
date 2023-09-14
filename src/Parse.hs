@@ -198,7 +198,7 @@ letexp = do
   i <- getPos
   reserved "let"
   isRec <- recursive
-  bs <- letbinding
+  bs <- letbinding <|> parens letbinding
   reservedOp "="
   def <- expr
   reserved "in"
@@ -221,7 +221,7 @@ decl = do
      i <- getPos
      reserved "let"
      isRec <- recursive
-     bs <- letbinding
+     bs <- letbinding <|> parens letbinding
      reservedOp "="
      t <- expr
      return (SDecl i isRec bs t)
