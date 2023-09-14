@@ -11,7 +11,6 @@ fully named (@STerm) a locally closed (@Term@)
 -}
 
 module Elab ( elab, typeElab, elabSDecl ) where
-module Elab ( elab, typeElab, elabSDecl ) where
 
 import Lang
 import Subst
@@ -27,12 +26,7 @@ elab = elab' []
 
 elab' :: MonadFD4 m => [Name] -> STerm -> m Term
 elab' env (SV p v) = 
-elab' :: MonadFD4 m => [Name] -> STerm -> m Term
-elab' env (SV p v) = 
   if v `elem` env 
-    then return (V p (Free v))
-    else return (V p (Global v))
-elab' _ (SConst p c) = return $ Const p c
     then return (V p (Free v))
     else return (V p (Global v))
 elab' _ (SConst p c) = return $ Const p c
