@@ -157,7 +157,6 @@ t2doc at (SLam _ vs t) =
            , args2doc vs
            , opColor(pretty "->")]
       , nest 2 (t2doc False t)]
-
 t2doc at t@(SApp _ _ _) =
   let (h, ts) = collectApp t in
   parenIf at $
