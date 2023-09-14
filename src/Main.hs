@@ -129,12 +129,12 @@ parseIO filename p x = case runP p x filename of
                   Left e  -> throwError (ParseErr e)
                   Right r -> return r
 
-evalDecl :: MonadFD4 m => Decl TTerm -> m (Decl TTerm)
-evalDecl (Decl p x e) = do
-    e' <- eval e
-    return (Decl p x e')
+-- evalDecl :: MonadFD4 m => Decl TTerm -> m (Decl TTerm)
+-- evalDecl (Decl p x ty e) = do
+--     e' <- eval e
+--     return (Decl p x ty e')
 
-handleDecl ::  MonadFD4 m => Decl STerm -> m ()
+handleDecl ::  MonadFD4 m => SDecl STerm STy -> m ()
 handleDecl d = do
         m <- getMode
         case m of
@@ -167,10 +167,17 @@ handleDecl d = do
                   ppterm <- ppDecl (Decl p'' x xty te)
                   printFD4 ppterm
           Eval -> do
-              td <- typecheckDecl d
-              -- td' <- if opt then optimizeDecl td else return td
-              ed <- evalDecl td
-              addDecl ed
+              case d of
+                (SType p n t) -> do
+                  nt <- typeElab p t
+                  addTypeDecl (n,addTyName nt n)
+                (SDecl p b bs t) -> do
+                  sd' <- elabSDecl p b bs t
+                  t'' <- elab $ sDeclBody sd'
+                  xty <- typeElab p $ snd $ head $ sDeclTy sd'
+                  (Decl p'' x xty' tt) <- tcDecl (Decl (sDeclPos sd') (fst $ head $ sDeclTy sd') xty t'')
+                  te <- eval tt
+                  addDecl (Decl p'' x xty' te)
   where
     addTyName (NatTy _) n = NatTy (Just n)
     addTyName (FunTy _ t1 t2) n = FunTy (Just n) t1 t2 
