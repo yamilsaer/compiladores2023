@@ -49,6 +49,7 @@ parseMode = (,) <$>
   -- <|> flag' Bytecompile (long "bytecompile" <> short 'm' <> help "Compilar a la BVM")
   -- <|> flag' RunVM (long "runVM" <> short 'r' <> help "Ejecutar bytecode en la BVM")
       <|> flag Interactive Interactive ( long "interactive" <> short 'i' <> help "Ejecutar en forma interactiva")
+      <|> flag Eval        Eval        (long "eval" <> short 'e' <> help "Evaluar programa")
   -- <|> flag' CC ( long "cc" <> short 'c' <> help "Compilar a código C")
   -- <|> flag' Canon ( long "canon" <> short 'n' <> help "Imprimir canonicalización")
   -- <|> flag' Assembler ( long "assembler" <> short 'a' <> help "Imprimir Assembler resultante")
@@ -87,6 +88,7 @@ runOrFail c m = do
 
 repl :: (MonadFD4 m, MonadMask m) => [FilePath] -> InputT m ()
 repl args = do
+       lift $ setInter True
        lift $ catchErrors $ mapM_ compileFile args
        s <- lift get
        when (inter s) $ liftIO $ putStrLn
@@ -117,7 +119,7 @@ compileFile ::  MonadFD4 m => FilePath -> m ()
 compileFile f = do
     i <- getInter
     setInter False
-    printFD4 ("Abriendo "++f++"...")
+    when i $ printFD4 ("Abriendo "++f++"...")
     decls <- loadFile f
     mapM_ handleDecl decls
     setInter i
@@ -127,7 +129,12 @@ parseIO filename p x = case runP p x filename of
                   Left e  -> throwError (ParseErr e)
                   Right r -> return r
 
-handleDecl :: MonadFD4 m => SDecl STerm STy -> m ()
+evalDecl :: MonadFD4 m => Decl TTerm -> m (Decl TTerm)
+evalDecl (Decl p x e) = do
+    e' <- eval e
+    return (Decl p x e')
+
+handleDecl ::  MonadFD4 m => Decl STerm -> m ()
 handleDecl d = do
         m <- getMode
         case m of
@@ -159,6 +166,11 @@ handleDecl d = do
                   addDecl (Decl p'' x xty' te)
                   ppterm <- ppDecl (Decl p'' x xty te)
                   printFD4 ppterm
+          Eval -> do
+              td <- typecheckDecl d
+              -- td' <- if opt then optimizeDecl td else return td
+              ed <- evalDecl td
+              addDecl ed
   where
     addTyName (NatTy _) n = NatTy (Just n)
     addTyName (FunTy _ t1 t2) n = FunTy (Just n) t1 t2 
