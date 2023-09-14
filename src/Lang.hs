@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE EmptyDataDeriving #-}
+{-# LANGUAGE InstanceSigs #-}
 
 {-|
 Module      : Lang
@@ -29,27 +30,35 @@ data STm info ty var =
   | SConst info Const
   | SLam info [(var, ty)] (STm info ty var)
   | SApp info (STm info ty var) (STm info ty var)
-  | SPrint info String (STm info ty var)
+  | SPrint info String (Maybe (STm info ty var))
   | SBinaryOp info BinaryOp (STm info ty var) (STm info ty var)
   | SFix info (var, ty) [(var, ty)] (STm info ty var)
   | SIfZ info (STm info ty var) (STm info ty var) (STm info ty var)
   | SLet Bool info [(var, ty)] (STm info ty var) (STm info ty var)
   deriving (Show, Functor)
 
--- data STy var =
---     SNatTy
---   | SFunTy (STy var) (STy var)
---   | SVarTy var
+data STy =
+    SNatTy
+  | SFunTy STy STy
+  | SVarTy Name
+  deriving (Show, Eq)
 
 -- | AST de Tipos
 data Ty =
-      NatTy
-    | FunTy Ty Ty
-    deriving (Show,Eq)
+      NatTy (Maybe Name)
+    | FunTy (Maybe Name) Ty Ty
+    deriving (Show)
+
+instance Eq Ty where
+  (==) :: Ty -> Ty -> Bool
+  (NatTy _) == (NatTy _) = True 
+  (FunTy _ t1 t2) == (FunTy _ t1' t2') = t1 == t1' && t2 == t2'
+  t1 == t2 = False
+
 
 type Name = String
 
-type STerm = STm Pos Ty Name -- ^ 'STm' tiene 'Name's como variables ligadas y libres y globales, guarda posición  
+type STerm = STm Pos STy Name -- ^ 'STm' tiene 'Name's como variables ligadas y libres y globales, guarda posición  
 
 newtype Const = CNat Int
   deriving Show
@@ -61,7 +70,22 @@ data BinaryOp = Add | Sub
 data Decl a = Decl
   { declPos  :: Pos
   , declName :: Name
+  , declTy :: Ty
   , declBody :: a
+  }
+  deriving (Show, Functor)
+
+data SDecl a b = SDecl
+  { sDeclPos  :: Pos
+  , sDeclRec :: Bool
+  , sDeclTy :: [(Name,STy)]
+  , sDeclBody :: a
+  }
+  | SType
+  { 
+    tyPos  :: Pos
+  , tyName :: Name
+  , tyBody :: b
   }
   deriving (Show, Functor)
 

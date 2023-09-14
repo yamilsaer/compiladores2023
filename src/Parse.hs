@@ -82,16 +82,17 @@ getPos :: P Pos
 getPos = do pos <- getPosition
             return $ Pos (sourceLine pos) (sourceColumn pos)
 
-tyatom :: P Ty
-tyatom = (reserved "Nat" >> return NatTy)
+tyatom :: P STy
+tyatom = (reserved "Nat" >> return SNatTy)
+         <|> (do v <- var; return (SVarTy v))
          <|> parens typeP
 
-typeP :: P Ty
+typeP :: P STy
 typeP = try (do 
           x <- tyatom
           reservedOp "->"
           y <- typeP
-          return (FunTy x y))
+          return (SFunTy x y))
       <|> tyatom
           
 const :: P Const
@@ -102,8 +103,14 @@ printOp = do
   i <- getPos
   reserved "print"
   str <- option "" stringLiteral
-  a <- atom
+  a <- maybeAtom
   return (SPrint i str a)
+
+maybeAtom :: P (Maybe STerm)
+maybeAtom = do
+  a <- atom
+  return (Just a)
+  <|> return Nothing
 
 binary :: String -> BinaryOp -> Assoc -> Operator String () Identity STerm
 binary s f = Ex.Infix (reservedOp s >> return (SBinaryOp NoPos f))
@@ -122,25 +129,25 @@ atom =     (flip SConst <$> const <*> getPos)
        <|> printOp
 
 -- parsea un par (variable : tipo)
-binding :: P [(Name, Ty)]
+binding :: P [(Name, STy)]
 binding = do v <- var
              reservedOp ":"
              ty <- typeP
              return [(v, ty)]
 
 -- parsea tipos (var1 var2 ... varn : tipo )
-multibinders :: P [(Name, Ty)]
+multibinders :: P [(Name, STy)]
 multibinders = do vs <- many1 var
                   reservedOp ":"
                   ty <- typeP
                   return (map (,ty) vs)
 
 
-binders :: P [(Name, Ty)]
-binders = do bs <- many1 $ parens binding <|> parens multibinders
-             return $ concat bs
+binders :: P [(Name, STy)]
+binders = do 
+  bs <- many1  (parens multibinders <|> parens binding)
+  return $ concat bs
 
--- (x y:Nat)(z: Nat->Nat)
 lam :: P STerm
 lam = do i <- getPos
          reserved "fun"
@@ -175,20 +182,24 @@ fix = do i <- getPos
          t <- expr
          return (SFix i (f,fty) bs t)
 
-letbinding :: P [(Name, Ty)]
+letbinding :: P [(Name, STy)]
 letbinding = do v <- var
-                bs <- binders
+                bs <- binders0
                 reservedOp ":"
                 ty <- typeP
                 return $ (v, ty):bs
+  where
+    binders0 = do 
+      bs <- many (parens multibinders <|> parens binding)
+      return $ concat bs
 
 letexp :: P STerm
 letexp = do
   i <- getPos
   reserved "let"
-  isRec <- (do reserved "rec"; return True) <|> return False
-  bs <- if isRec then letbinding else letbinding <|> binding <|> parens binding
-  reservedOp "="  
+  isRec <- recursive
+  bs <- letbinding
+  reservedOp "="
   def <- expr
   reserved "in"
   body <- expr
@@ -198,24 +209,41 @@ letexp = do
 tm :: P STerm
 tm = app <|> lam <|> ifz <|> printOp <|> fix <|> letexp
 
+recursive :: P Bool
+recursive = do
+  reserved "rec"
+  return True
+  <|> return False
+
 -- | Parser de declaraciones
-decl :: P (Decl STerm)
+decl :: P (SDecl STerm STy)
 decl = do 
      i <- getPos
      reserved "let"
-     v <- var
+     isRec <- recursive
+     bs <- letbinding
      reservedOp "="
      t <- expr
-     return (Decl i v t)
+     return (SDecl i isRec bs t)
+     <|> typeDecl
+
+typeDecl :: P (SDecl STerm STy)
+typeDecl = do
+  i <- getPos
+  reserved "type"
+  n <- var
+  reservedOp "="
+  ty <- typeP
+  return (SType i n ty)
 
 -- | Parser de programas (listas de declaraciones) 
-program :: P [Decl STerm]
+program :: P [SDecl STerm STy]
 program = many decl
 
 -- | Parsea una declaración a un término
 -- Útil para las sesiones interactivas
-declOrTm :: P (Either (Decl STerm) STerm)
-declOrTm =  try (Left <$> decl) <|> (Right <$> expr)
+declOrTm :: P (Either (SDecl STerm STy) STerm)
+declOrTm =  try (Right <$> expr) <|> (Left <$> decl) 
 
 -- Corre un parser, chequeando que se pueda consumir toda la entrada
 runP :: P a -> String -> String -> Either ParseError a

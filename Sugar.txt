@@ -1,23 +1,114 @@
-a) 
--------
-Lang.hs 
+----
+Lang
+----
+Creamos un tipo Sty que refiere a los tipos superficiales, permitiendo tener los terminos:
+Nat, Fun y una tipo variable (definido con type)
+STerm adopta tipo superficiales en vez de core.
+Creamos un tipo de declaraciones superficial, que puede ser de dos tipos. El primero declaraciones
+como la sección 1.2 del apunte, y la segunda del tipo "type ... = ..." 
+----
+Elab
+----
+Del módulo exportamos elab, typeElab y elabSDecl
+
+elab :
+    elab'
+        Cambiamos el tipo de la función para manejar de manera más abstracta los
+        errores, permientiendo mensajes de errores más descriptivos.
+        Tuvimos en cuenta los términos de la sección 1.1 del apunte azúcar sintáctico.
+        Tuvimos que agregar casos extras que no se evaluaran ya que habia problemas con 
+        el patter matching de la función, como en el caso de fix sin variables, su comportamiento
+        esta no esta definido ("undefined").
+        Dentro de la función, hacemos uso de dos funciones definidas extras : typeElab
+        y mapTypes (aplicacion map de typeElab). El uso de la primera función es transformar 
+        los tipos superficiales a tipos core para aplicarle a la estructura Term.
+        Finalmente en elabSDecl, consideramos la sección 1.2 del apunte y transformamos las
+        declaraciones superficiales a core.
+
+------
+Global
+------
+A los entornos globales agregamos las declaraciones globales de los tipos superficiales ya traducidos a tipos core
+Es una lista del tipo [(Name,Ty)]
+
+----
+Main
+----
+Modificamos la función handleDecl. Ahora esta función toma tipo declaraciones superficiales
+y en caso de ser en modo Interactivo : Si es una declaracion de algún tipo, traduce el tipo superficial
+al tipo core y lo agrega al entorno global usando addTypeDecl. Sino elabora la declaracion primero con
+elabSDecl y luego con elab, lo pasa a ser un tipo Decl, lo evalua y lo agrega al 
+enviroment global. 
+En caso de ser modo TypeChecker : en el caso de Stype es igual, y en caso de declaraciones
+es lo mismo solo que luego imprime el término
+
+sd' <- elabSDecl p b bs t
+t'' <- elab $ sDeclBody sd' -> Xq aca va sDeclBody?? -> Funcion que toma un record y devuelve esa componente
+(Decl p'' x tt) <- tcDecl (Decl (sDeclPos sd') (fst $ head $ sDeclTy sd') t'') -> xq pones sDeclPos y sDeclTy?? -> Funciones automaticas que te crea el record
+
 --------
-Modificamos inicialmente SLet (agregamos bool)
-Agregamos en SLet,SLam y SFix para que puedan se puedan definir con multiples argumentos
+MonadFD4
+--------
+Agregamos una función para poder agregar las declaraciones globales
+de los tipos ("type ...") llamada addTypeDecl que simplemente lo agrega al
+principio de la lista global que ya se tiene.
+
+Además lookupTyDecl, busca si existe el tipo definido de un nombre dado
+extrae el entorno global, y luego la lista sType y la busca y si lo encuentra 
+lo devuelve dentro de la monada Just sino con Nothing
+
+-----
+Parse
+-----
+Realizamos un cambio de tipo, estas funciones pasan a tomar términos del tipo STy y no
+del tipo Ty : tyatom,typeP (estas funciones se usan para parsear tipos).
+Hacemos lo mismo con binding y usamos esa funcion para parsear declaraciones con muchas
+variables con multibinders. Binders hace uso de las funciones anteriores para poder pasear
+y obtener asi las variables de un termino con sus tipos.
+Cambiamos el parse del término fix por uno más apropiado que primero tome la funcion y su tipo
+y luego sus binders.
+letbinding es una función auxiliar utilizada para pasear términos del tipo let, donde parsea primero
+la variables y luego se fija si existe binders. Esta función se usa en letexp, que parsea las expresiones 
+completas de la forma "let ... in ...".
+Creamos recursive, una función auxiliar para verificar si esta o no la palabra reservada "rec" en la función 
+del término que se parseo.
+decl parsea declaraciones de una manera similar a lexexp solo que en expresiones de let sin in y en caso de 
+error llama a typeDecl que parsea expresiones del tipo "type ... = ..."
+declOrTm dimos vuelta los terminos del try ya que no tomaba bien las declaraciones del tipo
+"let ... in ...", con esa acción lo pudimos arreglar.
+
+------
+PPrint
+------
+En la función openAll, para preservar el tipo hacemos uso de la función typeToSType 
+que transforma los tipos core a superficial.
+La función sty2doc, es analoga a ty2doc solo que toma tipos superficiales.
+Le cambiamos el tipo binding2doc, para que tome tipos superficial para t2doc que imprime
+términos 
+
+-----
+Eval
+-----
+Unchanged
 
 -------
-Parse.hs 
---------
-Creamos binders y multibinders para poder permitir parsear varios argumentos, debido a las modificaciones anteriores
-multibinders es similar a binding pero toma varias variables
-binders hacemos many de multibinders y binding y juntamos la listas de listas de resultados y hacemos concat
-Modificamos fix, de acuerdo al punto anterior
-
-Creamos un letbinding, para parsear la funcion y sus elementos, con esta funcion la usamos en letexp. 
-Adicionalmente determinamos el booleano de acuerdo si hay rec o no
+Common
+-------
+Unchanged
 
 -------
-Elab.hs
---------
-Modificamos elab' para adaptarse a las modificaciones de los binders
-Tuvimos en cuenta el pdf para ver como hacer las recuersiones
+Errors
+-------
+Unchanged
+
+------------
+TypeChecker
+------------
+Unchanged
+
+------
+Subst
+------
+Unchanged
+
+
