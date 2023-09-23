@@ -15,13 +15,12 @@ module Main where
 import System.Console.Haskeline ( defaultSettings, getInputLine, runInputT, InputT )
 import Control.Monad.Catch (MonadMask)
 
---import Control.Monad
 import Control.Monad.Trans
 import Data.List (nub, isPrefixOf, intercalate )
 import Data.Char ( isSpace )
 import Control.Exception ( catch , IOException )
 import System.IO ( hPrint, stderr, hPutStrLn )
-import Data.Maybe ( fromMaybe )
+import Data.Maybe ( fromMaybe, isNothing, fromJust )
 
 import System.Exit ( exitWith, ExitCode(ExitFailure) )
 import Options.Applicative
@@ -34,6 +33,26 @@ import Elab ( elab, typeElab, elabSDecl )
 import Eval ( eval )
 import PPrint ( pp , ppTy, ppDecl )
 import MonadFD4
+    ( when,
+      void,
+      MonadError(throwError),
+      MonadState(get),
+      gets,
+      FD4,
+      MonadFD4,
+      getMode,
+      setInter,
+      getInter,
+      printFD4,
+      setLastFile,
+      getLastFile,
+      addDecl,
+      addTypeDecl,
+      eraseLastFileDecls,
+      lookupDecl,
+      catchErrors,
+      runFD4 )
+import CEKMachine(evalCEK)
 import TypeChecker ( tc, tcDecl )
 
 prompt :: String
@@ -45,7 +64,7 @@ prompt = "FD4> "
 parseMode :: Parser (Mode,Bool)
 parseMode = (,) <$>
       (flag' Typecheck ( long "typecheck" <> short 't' <> help "Chequear tipos e imprimir el término")
-  -- <|> flag' InteractiveCEK (long "interactiveCEK" <> short 'k' <> help "Ejecutar interactivamente en la CEK")
+  <|> flag' InteractiveCEK (long "interactiveCEK" <> short 'k' <> help "Ejecutar interactivamente en la CEK")
   -- <|> flag' Bytecompile (long "bytecompile" <> short 'm' <> help "Compilar a la BVM")
   -- <|> flag' RunVM (long "runVM" <> short 'r' <> help "Ejecutar bytecode en la BVM")
       <|> flag Interactive Interactive ( long "interactive" <> short 'i' <> help "Ejecutar en forma interactiva")
@@ -69,11 +88,13 @@ main = execParser opts >>= go
     opts = info (parseArgs <**> helper)
       ( fullDesc
      <> progDesc "Compilador de FD4"
-     <> header "Compilador de FD4 de la materia Compiladores 2022" )
+     <> header "Compilador de FD4 de la materia Compiladores 2023" )
 
     go :: (Mode,Bool,[FilePath]) -> IO ()
     go (Interactive,opt,files) =
               runOrFail (Conf opt Interactive) (runInputT defaultSettings (repl files))
+    go (InteractiveCEK,opt,files) =
+              runOrFail (Conf opt InteractiveCEK) (runInputT defaultSettings (repl files))
     go (m,opt, files) =
               runOrFail (Conf opt m) $ mapM_ compileFile files
 
@@ -129,58 +150,42 @@ parseIO filename p x = case runP p x filename of
                   Left e  -> throwError (ParseErr e)
                   Right r -> return r
 
--- evalDecl :: MonadFD4 m => Decl TTerm -> m (Decl TTerm)
--- evalDecl (Decl p x ty e) = do
---     e' <- eval e
---     return (Decl p x ty e')
+evalDecl :: MonadFD4 m => SDecl STerm STy -> m (Maybe (Decl TTerm))
+evalDecl d = 
+  case d of
+    (SType p n t) -> do
+      nt <- typeElab p t
+      addTypeDecl (n,addTyName nt n)
+      return Nothing
+    (SDecl p b bs t) -> do
+      sd' <- elabSDecl p b bs t
+      t'' <- elab $ sDeclBody sd'
+      xty <- typeElab p $ snd $ head $ sDeclTy sd'
+      (Decl p'' x xty' tt) <- tcDecl (Decl (sDeclPos sd') (fst $ head $ sDeclTy sd') xty t'')
+      te <- evalTerm tt
+      addDecl (Decl p'' x xty' te)
+      return (Just (Decl p'' x xty' te)) 
+  where
+    addTyName (NatTy _) n = NatTy (Just n)
+    addTyName (FunTy _ t1 t2) n = FunTy (Just n) t1 t2 
 
 handleDecl ::  MonadFD4 m => SDecl STerm STy -> m ()
 handleDecl d = do
         m <- getMode
         case m of
-          Interactive -> 
-            case d of
-              (SType p n t) -> do
-                nt <- typeElab p t
-                addTypeDecl (n,addTyName nt n)
-              (SDecl p b bs t) -> do
-                sd' <- elabSDecl p b bs t
-                t'' <- elab $ sDeclBody sd'
-                xty <- typeElab p $ snd $ head $ sDeclTy sd'
-                (Decl p'' x xty' tt) <- tcDecl (Decl (sDeclPos sd') (fst $ head $ sDeclTy sd') xty t'')
-                te <- eval tt
-                addDecl (Decl p'' x xty' te)
+          Interactive -> void (evalDecl d)
+          Eval -> void (evalDecl d)
           Typecheck -> do
               f <- getLastFile
               printFD4 ("Chequeando tipos de "++f)
-              case d of
-                (SType p n t) -> do
-                  nt <- typeElab p t
-                  addTypeDecl (n,addTyName nt n)
-                (SDecl p b bs t) -> do
-                  sd' <- elabSDecl p b bs t
-                  t'' <- elab $ sDeclBody sd'
-                  xty <- typeElab p $ snd $ head $ sDeclTy sd'
-                  (Decl p'' x xty' tt) <- tcDecl (Decl (sDeclPos sd') (fst $ head $ sDeclTy sd') xty t'')
-                  te <- eval tt
-                  addDecl (Decl p'' x xty' te)
-                  ppterm <- ppDecl (Decl p'' x xty te)
+              dcl <- evalDecl d
+              if isNothing dcl 
+                then return ()
+                else do
+                  ppterm <- ppDecl $ fromJust dcl
                   printFD4 ppterm
-          Eval -> do
-              case d of
-                (SType p n t) -> do
-                  nt <- typeElab p t
-                  addTypeDecl (n,addTyName nt n)
-                (SDecl p b bs t) -> do
-                  sd' <- elabSDecl p b bs t
-                  t'' <- elab $ sDeclBody sd'
-                  xty <- typeElab p $ snd $ head $ sDeclTy sd'
-                  (Decl p'' x xty' tt) <- tcDecl (Decl (sDeclPos sd') (fst $ head $ sDeclTy sd') xty t'')
-                  te <- eval tt
-                  addDecl (Decl p'' x xty' te)
-  where
-    addTyName (NatTy _) n = NatTy (Just n)
-    addTyName (FunTy _ t1 t2) n = FunTy (Just n) t1 t2 
+          InteractiveCEK -> void (evalDecl d)
+  
              
 data Command = Compile CompileForm
              | PPrint String
@@ -269,7 +274,7 @@ handleTerm t = do
          t' <- elab t
          s <- get
          tt <- tc t' (tyEnv s)
-         te <- eval tt
+         te <- evalTerm tt
          ppte <- pp te
          printFD4 (ppte ++ " : " ++ ppTy (getTy tt))
 
@@ -296,3 +301,13 @@ typeCheckPhrase x = do
          tt <- tc t' (tyEnv s)
          let ty = getTy tt
          printFD4 (ppTy ty)
+
+
+evalTerm :: MonadFD4 m => TTerm -> m TTerm
+evalTerm t = do 
+  m <- getMode
+  case m of
+    Interactive -> eval t
+    InteractiveCEK -> evalCEK t
+    Eval -> eval t
+    Typecheck -> eval t
