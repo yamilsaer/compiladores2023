@@ -277,7 +277,6 @@ resugar' (SLet b p vs def body) = SLet b p vs (resugar' def) (resugar' body)
 
 resugarD :: MonadFD4 m => Decl TTerm -> m (SDecl STerm STy)
 resugarD (Decl p n ty t) = do
-  gdecl <- gets glb 
   t' <- resugarT t
   return $ resugarD' $ SDecl p False [(n,typeToSType ty)] t'
   
