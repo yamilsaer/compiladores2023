@@ -10,8 +10,8 @@ type Env = [Value]
 data Value = Vm Int 
     | C Clos
 
-data Clos = CFun Env Name Ty TTerm 
-    | CFix Env Name Ty Name Ty TTerm -- CFix Env f x t
+data Clos = CFun Ty Env Name Ty TTerm 
+    | CFix Ty Env Name Ty Name Ty TTerm -- CFix Env f x t
 
 data Frame = KArg Env TTerm
     | KClos Clos
@@ -33,8 +33,8 @@ destroy (Vm n') ((KOpVal n op):ks) = destroy (Vm (semOp op n n')) ks
 destroy (Vm 0) (KIf e t u:ks) = seek t e ks
 destroy (Vm n) (KIf e t u:ks) = seek u e ks
 destroy (C c) (KArg e t:ks) = seek t e (KClos c:ks)
-destroy v (KClos (CFun e n _ t):ks) = seek t (v:e) ks
-destroy v (KClos c@(CFix e f _ n _ t):ks) = seek t (v:C c:e) ks
+destroy v (KClos (CFun _ e n _ t):ks) = seek t (v:e) ks
+destroy v (KClos c@(CFix _ e f _ n _ t):ks) = seek t (v:C c:e) ks
 destroy v (KLet e n t:ks) = seek t (v:e) ks
 destroy _ _ = undefined
 
@@ -51,15 +51,16 @@ seek (V _ (Global n)) e ks = do
         Just t -> seek t e ks
 seek (V _ (Free n)) e ks = undefined
 seek (Const _ (CNat n)) _ ks = destroy (Vm n) ks
-seek (Lam _ n ty (Sc1 t)) e ks = destroy (C (CFun e n ty t)) ks
-seek (Fix _ f fty n ty (Sc2 t)) e ks = destroy (C (CFix e f fty n ty t)) ks
+seek (Lam i n ty (Sc1 t)) e ks = destroy (C (CFun (snd i) e n ty t)) ks
+seek (Fix i f fty n ty (Sc2 t)) e ks = destroy (C (CFix (snd i) e f fty n ty t)) ks
 seek (Let _ n _ t1 (Sc1 t2)) e ks = seek t1 e (KLet e n t2:ks)
 
 
 valueToTerm :: MonadFD4 m => Value -> m TTerm
 valueToTerm (Vm n) = return (Const (NoPos,NatTy Nothing) (CNat n))
-valueToTerm (C (CFun _ n ty t)) = return (Lam (NoPos,ty) n ty (Sc1 t))
-valueToTerm (C (CFix _ f fty n ty t)) = return (Fix (NoPos,ty) f fty n ty (Sc2 t))
+valueToTerm (C (CFun fty _ n ty t)) = do
+    return (Lam (NoPos,fty) n ty (Sc1 t))
+valueToTerm (C (CFix fty' _ f fty n ty t)) = return (Fix (NoPos,fty') f fty n ty (Sc2 t))
 
 evalCEK :: MonadFD4 m => TTerm -> m TTerm
 evalCEK t = do

@@ -69,6 +69,7 @@ parseMode = (,) <$>
   -- <|> flag' RunVM (long "runVM" <> short 'r' <> help "Ejecutar bytecode en la BVM")
       <|> flag Interactive Interactive ( long "interactive" <> short 'i' <> help "Ejecutar en forma interactiva")
       <|> flag Eval        Eval        (long "eval" <> short 'e' <> help "Evaluar programa")
+      <|> flag EvalCEK     EvalCEK     (long "cek" <> short 'v' <> help "Evaluar programa en la CEK")
   -- <|> flag' CC ( long "cc" <> short 'c' <> help "Compilar a código C")
   -- <|> flag' Canon ( long "canon" <> short 'n' <> help "Imprimir canonicalización")
   -- <|> flag' Assembler ( long "assembler" <> short 'a' <> help "Imprimir Assembler resultante")
@@ -185,6 +186,7 @@ handleDecl d = do
                   ppterm <- ppDecl $ fromJust dcl
                   printFD4 ppterm
           InteractiveCEK -> void (evalDecl d)
+          EvalCEK -> void (evalDecl d)
   
              
 data Command = Compile CompileForm
@@ -311,3 +313,4 @@ evalTerm t = do
     InteractiveCEK -> evalCEK t
     Eval -> eval t
     Typecheck -> eval t
+    EvalCEK -> evalCEK t
