@@ -9,10 +9,10 @@ type Env = [Value]
 
 data Value = Vm Int 
     | C Clos
-
+    deriving Show
 data Clos = CFun Ty Env Name Ty TTerm 
     | CFix Ty Env Name Ty Name Ty TTerm -- CFix Env f x t
-
+    deriving Show
 data Frame = KArg Env TTerm
     | KClos Clos
     | KIf Env TTerm TTerm
@@ -55,14 +55,53 @@ seek (Lam i n ty (Sc1 t)) e ks = destroy (C (CFun (snd i) e n ty t)) ks
 seek (Fix i f fty n ty (Sc2 t)) e ks = destroy (C (CFix (snd i) e f fty n ty t)) ks
 seek (Let _ n _ t1 (Sc1 t2)) e ks = seek t1 e (KLet e n t2:ks)
 
+replaceBound :: MonadFD4 m => TTerm -> TTerm -> Int -> m TTerm
+replaceBound v@(V _ (Bound j)) t n = return $ if j == n then t else v
+replaceBound v@(V _ _) _ _ = return v
+replaceBound c@(Const _ _) _ _ = return c
+replaceBound (Lam i x ty (Sc1 t)) t' n = do
+    t'' <- replaceBound t t' (n+1)
+    return $ Lam i x ty (Sc1 t'')
+replaceBound (App i t1 t2) t n = do
+    t1' <- replaceBound t1 t n
+    t2' <- replaceBound t2 t n
+    return $ App i t1' t2'
+replaceBound (Print i str t) t' n = do
+    t'' <- replaceBound t t' n
+    return $ Print i str t''
+replaceBound (BinaryOp i op t1 t2) t n = do
+    t1' <- replaceBound t1 t n
+    t2' <- replaceBound t2 t n
+    return $ BinaryOp i op t1' t2'
+replaceBound (IfZ i c t1 t2) t n = do
+    c' <- replaceBound c t n
+    t1' <- replaceBound t1 t n
+    t2' <- replaceBound t2 t n
+    return $ IfZ i c' t1' t2'
+replaceBound (Fix i f fty x ty (Sc2 t)) t' n = do
+    t'' <- replaceBound t t' (n+2)
+    return $ Fix i f fty x ty (Sc2 t'')
+replaceBound (Let i x ty t1 (Sc1 t2)) t n = do
+    t1' <- replaceBound t1 t n
+    t2' <- replaceBound t2 t (n+1)
+    return $ Let i x ty t1' (Sc1 t2')
 
-valueToTerm :: MonadFD4 m => Value -> m TTerm
-valueToTerm (Vm n) = return (Const (NoPos,NatTy Nothing) (CNat n))
-valueToTerm (C (CFun fty _ n ty t)) = do
-    return (Lam (NoPos,fty) n ty (Sc1 t))
-valueToTerm (C (CFix fty' _ f fty n ty t)) = return (Fix (NoPos,fty') f fty n ty (Sc2 t))
+
+valueToTerm :: MonadFD4 m => Value -> Int -> m TTerm
+valueToTerm (Vm n) _ = return (Const (NoPos,NatTy Nothing) (CNat n))
+valueToTerm (C (CFun fty [] n ty t)) _ = return (Lam (NoPos,fty) n ty (Sc1 t))
+valueToTerm (C (CFun fty (v:vs) n ty t)) d = do
+    t' <- valueToTerm (C (CFun fty vs n ty t)) (d+1)
+    v' <- valueToTerm v 0
+    replaceBound t' v' d
+valueToTerm (C (CFix fty' [] f fty n ty t)) _ = return (Fix (NoPos,fty') f fty n ty (Sc2 t))
+valueToTerm (C (CFix fty' (v:vs) f fty n ty t)) d = do
+    t' <- valueToTerm (C (CFix fty' vs f fty n ty t)) (d+1)
+    v' <- valueToTerm v 0
+    replaceBound t' v' d
 
 evalCEK :: MonadFD4 m => TTerm -> m TTerm
 evalCEK t = do
       v <- seek t [] []
-      valueToTerm v
+      valueToTerm v 0
+      
