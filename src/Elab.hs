@@ -115,4 +115,4 @@ elabSDecl i True [(f,fty)] t = failPosFD4 i ("La definicion " ++ f ++ " no tiene
 elabSDecl i True [(f,fty),(v,vty)] t = return (SDecl i True [(f,SFunTy vty fty)] (SFix i (f,SFunTy vty fty) [(v,vty)] t))
 elabSDecl i True ((f,fty):(v,vty):vs) t =
   let fty' = foldr (SFunTy . snd) fty vs
-  in elabSDecl i True [(f,fty'),(v,vty)] t 
+  in elabSDecl i True [(f,fty'),(v,vty)] (SLam i vs t)

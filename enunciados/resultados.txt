@@ -1,0 +1,10 @@
+Macchina:
+real    9m24,355s
+user    8m55,211s
+sys     0m41,301s
+
+C nativo:
+real    0m0,411s
+user    0m0,406s
+sys     0m0,006s
+

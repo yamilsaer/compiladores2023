@@ -141,7 +141,7 @@ bcc (BinaryOp _ op t1 t2) = do
     Sub -> return $ t' ++ t'' ++ [SUB]
 bcc (Fix _ _ _ _ _ (Sc2 t)) = do
   t' <- bcc t
-  return $ [FUNCTION,length t'] ++ t' ++ [RETURN,FIX]
+  return $ [FUNCTION,length t'+1] ++ t' ++ [RETURN,FIX]
 bcc (IfZ _ c t1 t2) = do
   c' <- bcc c
   t' <- bcc t1
