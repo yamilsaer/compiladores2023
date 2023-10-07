@@ -4,15 +4,14 @@ import MonadFD4
 import Eval(semOp)
 import PPrint(ppName)
 import Common
-
 type Env = [Value]
 
 data Value = Vm Int 
     | C Clos
-    deriving Show
+
 data Clos = CFun Ty Env Name Ty TTerm 
     | CFix Ty Env Name Ty Name Ty TTerm -- CFix Env f x t
-    deriving Show
+
 data Frame = KArg Env TTerm
     | KClos Clos
     | KIf Env TTerm TTerm
@@ -86,7 +85,6 @@ replaceBound (Let i x ty t1 (Sc1 t2)) t n = do
     t2' <- replaceBound t2 t (n+1)
     return $ Let i x ty t1' (Sc1 t2')
 
-
 valueToTerm :: MonadFD4 m => Value -> Int -> m TTerm
 valueToTerm (Vm n) _ = return (Const (NoPos,NatTy Nothing) (CNat n))
 valueToTerm (C (CFun fty [] n ty t)) _ = return (Lam (NoPos,fty) n ty (Sc1 t))
@@ -100,8 +98,13 @@ valueToTerm (C (CFix fty' (v:vs) f fty n ty t)) d = do
     v' <- valueToTerm v 0
     replaceBound t' v' d
 
+-- valueToTerm :: MonadFD4 m => Value -> m TTerm
+-- valueToTerm (Vm n) = return (Const (NoPos,NatTy Nothing) (CNat n))
+-- valueToTerm (C (CFun fty _ n ty t)) = do
+--     return (Lam (NoPos,fty) n ty (Sc1 t))
+-- valueToTerm (C (CFix fty' _ f fty n ty t)) = return (Fix (NoPos,fty') f fty n ty (Sc2 t))
+
 evalCEK :: MonadFD4 m => TTerm -> m TTerm
 evalCEK t = do
       v <- seek t [] []
       valueToTerm v 0
-      

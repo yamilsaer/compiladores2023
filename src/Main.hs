@@ -54,6 +54,8 @@ import MonadFD4
       runFD4 )
 import CEKMachine(evalCEK)
 import TypeChecker ( tc, tcDecl )
+import Bytecompile (bytecompileModule, bcWrite, bcRead, runBC)
+import System.FilePath (dropExtension)
 
 prompt :: String
 prompt = "FD4> "
@@ -64,9 +66,9 @@ prompt = "FD4> "
 parseMode :: Parser (Mode,Bool)
 parseMode = (,) <$>
       (flag' Typecheck ( long "typecheck" <> short 't' <> help "Chequear tipos e imprimir el término")
-  <|> flag' InteractiveCEK (long "interactiveCEK" <> short 'k' <> help "Ejecutar interactivamente en la CEK")
-  -- <|> flag' Bytecompile (long "bytecompile" <> short 'm' <> help "Compilar a la BVM")
-  -- <|> flag' RunVM (long "runVM" <> short 'r' <> help "Ejecutar bytecode en la BVM")
+      <|> flag' InteractiveCEK (long "interactiveCEK" <> short 'k' <> help "Ejecutar interactivamente en la CEK")
+      <|> flag' Bytecompile (long "bytecompile" <> short 'm' <> help "Compilar a la BVM")
+      <|> flag' RunVM (long "runVM" <> short 'r' <> help "Ejecutar bytecode en la BVM")
       <|> flag Interactive Interactive ( long "interactive" <> short 'i' <> help "Ejecutar en forma interactiva")
       <|> flag Eval        Eval        (long "eval" <> short 'e' <> help "Evaluar programa")
       <|> flag EvalCEK     EvalCEK     (long "cek" <> short 'v' <> help "Evaluar programa en la CEK")
@@ -96,6 +98,10 @@ main = execParser opts >>= go
               runOrFail (Conf opt Interactive) (runInputT defaultSettings (repl files))
     go (InteractiveCEK,opt,files) =
               runOrFail (Conf opt InteractiveCEK) (runInputT defaultSettings (repl files))
+    go (Bytecompile,opt,files) =
+              runOrFail (Conf opt Bytecompile) $ mapM_ compileBytecode files
+    go (RunVM,opt,files) =
+              runOrFail (Conf opt RunVM) $ mapM_ runVM files
     go (m,opt, files) =
               runOrFail (Conf opt m) $ mapM_ compileFile files
 
@@ -146,6 +152,23 @@ compileFile f = do
     mapM_ handleDecl decls
     setInter i
 
+compileBytecode :: MonadFD4 m => FilePath -> m ()
+compileBytecode f = do
+    i <- getInter
+    setInter False
+    when i $ printFD4 ("Abriendo "++f++"...")
+    decls <- loadFile f
+    mapM_ handleDecl decls
+    gdecl <- gets glb
+    bcode <- bytecompileModule (reverse gdecl)
+    liftIO $ bcWrite bcode (dropExtension f ++ ".bc32")
+    setInter i
+
+runVM :: MonadFD4 m => FilePath -> m ()
+runVM f = do
+  bc <- liftIO $ bcRead f
+  runBC bc
+
 parseIO ::  MonadFD4 m => String -> P a -> String -> m a
 parseIO filename p x = case runP p x filename of
                   Left e  -> throwError (ParseErr e)
@@ -170,6 +193,24 @@ evalDecl d =
     addTyName (NatTy _) n = NatTy (Just n)
     addTyName (FunTy _ t1 t2) n = FunTy (Just n) t1 t2 
 
+putDecl :: MonadFD4 m => SDecl STerm STy -> m ()
+putDecl d = 
+  case d of
+    (SType p n t) -> do
+      nt <- typeElab p t
+      addTypeDecl (n,addTyName nt n)
+      return ()
+    (SDecl p b bs t) -> do
+      sd' <- elabSDecl p b bs t
+      t'' <- elab $ sDeclBody sd'
+      xty <- typeElab p $ snd $ head $ sDeclTy sd'
+      (Decl p'' x xty' tt) <- tcDecl (Decl (sDeclPos sd') (fst $ head $ sDeclTy sd') xty t'')
+      addDecl (Decl p'' x xty' tt)
+  where
+    addTyName (NatTy _) n = NatTy (Just n)
+    addTyName (FunTy _ t1 t2) n = FunTy (Just n) t1 t2 
+
+
 handleDecl ::  MonadFD4 m => SDecl STerm STy -> m ()
 handleDecl d = do
         m <- getMode
@@ -187,6 +228,8 @@ handleDecl d = do
                   printFD4 ppterm
           InteractiveCEK -> void (evalDecl d)
           EvalCEK -> void (evalDecl d)
+          Bytecompile -> putDecl d
+          RunVM -> return ()
   
              
 data Command = Compile CompileForm
@@ -314,3 +357,4 @@ evalTerm t = do
     Eval -> eval t
     Typecheck -> eval t
     EvalCEK -> evalCEK t
+    _ -> eval t
