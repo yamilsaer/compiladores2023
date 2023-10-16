@@ -1,7 +1,7 @@
 Macchina:
-real    9m24,355s
-user    8m55,211s
-sys     0m41,301s
+real    9m9,553s
+user    8m42,981s
+sys     0m40,384s
 
 C nativo:
 real    0m0,411s
