@@ -1,0 +1,5 @@
+let f:Nat = 
+    (let x:Nat = 4 in
+        let z:Nat = 1 in 
+            let w:Nat = 2 in 
+                x + w + 3)

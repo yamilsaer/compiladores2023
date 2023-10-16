@@ -194,8 +194,13 @@ void run(code init_c)
 		/* Consumimos un opcode y lo inspeccionamos. */
 		switch(*c++) {
 		case ACCESS: {
-			/* implementame */
-			abort();
+			/* Accede al valor en el indice idx del entorno */
+			int idx = *c++;
+			env aux = e;
+			for(int i = 0; i < idx;i++) 
+				aux = aux->next;
+			*s++ = aux->v;
+			break;
 		}
 
 		case CONST: {
@@ -268,8 +273,13 @@ void run(code init_c)
 		}
 
 		case TAILCALL: {
-			/* implementame */
-			abort();
+			value v = *--s;
+			value gClo = *--s;
+
+			c = gClo.clo.clo_body;
+			e = env_push(gClo.clo.clo_env,v);
+
+			break;
 		}
 
 		case FUNCTION: {
@@ -325,13 +335,14 @@ void run(code init_c)
 		}
 
 		case SHIFT: {
-			/* implementame */
-			abort();
+			value v = *--s;
+			e = env_push(e,v);
+			break;
 		}
 
 		case DROP: {
-			/* implementame */
-			abort();
+			e = e->next;
+			break;
 		}
 
 		case PRINTN: {
@@ -345,6 +356,20 @@ void run(code init_c)
 			while ((wc = *c++))
 				putwchar(wc);
 
+			break;
+		}
+
+		case JUMP: {
+			int j = *c++;
+			c = c+j;
+			break;
+		}
+
+		case CJUMP: {
+			int j = *c++;
+			value cond = *--s;
+			if (cond.i != 0) 
+				c = c+j;
 			break;
 		}
 

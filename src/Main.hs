@@ -54,7 +54,7 @@ import MonadFD4
       runFD4 )
 import CEKMachine(evalCEK)
 import TypeChecker ( tc, tcDecl )
-import Bytecompile (bytecompileModule, bcWrite, bcRead, runBC)
+import Bytecompile (bytecompileModule, bcWrite, bcRead, runBC, showBC)
 import System.FilePath (dropExtension)
 
 prompt :: String
@@ -161,6 +161,7 @@ compileBytecode f = do
     mapM_ handleDecl decls
     gdecl <- gets glb
     bcode <- bytecompileModule (reverse gdecl)
+    printFD4 $ showBC bcode
     liftIO $ bcWrite bcode (dropExtension f ++ ".bc32")
     setInter i
 

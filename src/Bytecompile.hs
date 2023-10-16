@@ -89,6 +89,10 @@ pattern PRINTN :: Int
 pattern PRINTN   = 14
 pattern JUMP :: Int
 pattern JUMP     = 15
+pattern TAILCALL :: Int
+pattern TAILCALL = 16
+pattern SDROP :: Int
+pattern SDROP = 17
 
 data Val = I Int | Fun Env Bytecode | RA Env Bytecode deriving Show
 type Env = [Val]
@@ -113,10 +117,19 @@ showOps (DROP:xs)        = "DROP" : showOps xs
 showOps (PRINT:xs)       = let (msg,_:rest) = span (/=NULL) xs
                            in ("PRINT " ++ show (bc2string msg)) : showOps rest
 showOps (PRINTN:xs)      = "PRINTN" : showOps xs
+showOps (TAILCALL:xs)    = "TAILCALL" : showOps xs
 showOps (x:xs)           = show x : showOps xs
 
 showBC :: Bytecode -> String
 showBC = intercalate "; " . showOps
+
+-- bcc2 elimina los drops antes del STOP, ya que no hace falta evaluarlos.
+bcc2 :: MonadFD4 m => TTerm -> m Bytecode
+bcc2 (Let _ _ _ t1 (Sc1 t2)) = do
+  t' <- bcc t1
+  t'' <- bcc2 t2
+  return $ t' ++ [SHIFT] ++ t''
+bcc2 t = bcc t
 
 bcc :: MonadFD4 m => TTerm -> m Bytecode
 bcc (V _ (Bound n)) = return [ACCESS,n]
@@ -124,8 +137,8 @@ bcc (V _ (Free n)) = failFD4 "Error Free"
 bcc (V _ (Global n)) = failFD4 "Error Global"
 bcc (Const _ (CNat n)) = return [CONST,n]
 bcc (Lam _ _ _ (Sc1 t)) = do
-  t' <- bcc t
-  return $ [FUNCTION,length t'+1] ++ t' ++ [RETURN]
+  t' <- bct t
+  return $ [FUNCTION,length t'+1] ++ t'
 bcc (App _ t1 t2) = do
   t' <- bcc t1
   t'' <- bcc t2
@@ -140,8 +153,8 @@ bcc (BinaryOp _ op t1 t2) = do
     Add -> return $ t' ++ t'' ++ [ADD]
     Sub -> return $ t' ++ t'' ++ [SUB]
 bcc (Fix _ _ _ _ _ (Sc2 t)) = do
-  t' <- bcc t
-  return $ [FUNCTION,length t'+1] ++ t' ++ [RETURN,FIX]
+  t' <- bct t
+  return $ [FUNCTION,length t'+1] ++ t' ++ [FIX]
 bcc (IfZ _ c t1 t2) = do
   c' <- bcc c
   t' <- bcc t1
@@ -151,6 +164,24 @@ bcc (Let _ _ _ t1 (Sc1 t2)) = do
   t' <- bcc t1
   t'' <- bcc t2
   return $ t' ++ [SHIFT] ++ t'' ++ [DROP]
+
+bct :: MonadFD4 m => TTerm -> m Bytecode
+bct (App _ t1 t2) = do
+  t' <- bcc t1
+  t'' <- bcc t2
+  return $ t' ++ t'' ++ [TAILCALL]
+bct (IfZ _ c t1 t2) = do
+  c' <- bcc c
+  t' <- bct t1
+  t'' <- bct t2
+  return $ c' ++ [CJUMP,length t'+ 2] ++ t' ++ [JUMP,length t''] ++ t''
+bct (Let _ _ _ t1 (Sc1 t2)) = do
+  t' <- bcc t1
+  t'' <- bct t2
+  return $ t' ++ [SHIFT] ++ t''
+bct t = do
+  t' <- bcc t
+  return $ t' ++ [RETURN]
 
 -- ord/chr devuelven los codepoints unicode, o en otras palabras
 -- la codificación UTF-32 del caracter.
@@ -183,7 +214,7 @@ bytecompileModule :: MonadFD4 m => Module -> m Bytecode
 bytecompileModule m = 
   let t = module2Term m
   in do
-    t' <- bcc t
+    t' <- bcc2 t
     return $ t' ++ [STOP]
 
 -- | Toma un bytecode, lo codifica y lo escribe un archivo
@@ -234,5 +265,7 @@ runBC' (FIX:bs) e (Fun _ cf:s) =
 runBC' (CJUMP:n:bs) e (I m:s) = if m == 0
   then runBC' bs e s
   else runBC' (drop n bs) e s
+runBC' (TAILCALL:bs) _ (v:Fun e' bs':s) = runBC' bs' (v:e') s
+runBC' (SDROP:bs) e (v:s) = runBC' bs e s
 runBC' (b:_) _ _ = failFD4 $ "Instrucción inválida: " ++ show b
 runBC' _ _ _ = failFD4 "Error inesperado"
