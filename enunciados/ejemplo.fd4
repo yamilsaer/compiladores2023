@@ -1,3 +1,4 @@
-let f(x:Nat):Nat = x + 1
-
-let x:Nat = let g:Nat->Nat = f in f 4
+let f:Nat = let (x:Nat) = 20 in
+  let (z:Nat) = x+1 in
+  let (b:Nat) = print "hola" 1 in
+  z

@@ -13,7 +13,7 @@ import Lang
       Const(CNat),
       Name,
       getInfo )
-import MonadFD4 (MonadFD4, printFD4,lookupDecl, failFD4)
+import MonadFD4 (MonadFD4,lookupDecl, failFD4)
 import Subst (subst)
 import PPrint (ppName,freshen)
 
@@ -21,11 +21,7 @@ pattern COST :: Int
 pattern COST     = 10
 
 optimize :: MonadFD4 m => TTerm -> m TTerm
-optimize t = do
-    printFD4 $ show t
-    t' <- iterate (>>= optimizer) (return t) !! 2
-    printFD4 $ show t'
-    return t'
+optimize t = iterate (>>= optimizer) (return t) !! 3
 
 
 optimizer :: MonadFD4 m => TTerm -> m TTerm
@@ -116,7 +112,7 @@ consPropagation (Let i x xty def (Sc1 body)) = do
         Const i2 c -> let body' = subst (Const i2 c) (Sc1 body) in 
             do
             body'' <- consPropagation body'
-            return $ Let i x xty def' (Sc1 body'')
+            return $ Let i x xty def' (Sc1 body')
         t -> do
             body' <- consPropagation body
             return $ Let i x xty def' (Sc1 body')
@@ -146,8 +142,9 @@ deadCode (IfZ i c t0 t1) = do
     t0' <- deadCode t0
     t1' <- deadCode t1
     return $ IfZ i c' t0' t1' 
-deadCode (Let i x xty def (Sc1 body)) = if not (hasPrint def) && not (occurs body 0) then do
-    deadCode $ mapBound body
+deadCode (Let i x xty def (Sc1 body)) = do
+    if not (hasPrint def) && not (occurs body 0) then
+        deadCode $ mapBound body 0
     else do
         def' <- deadCode def
         body' <- deadCode body
@@ -180,17 +177,17 @@ occurs (Fix _ _ _ _ _ (Sc2 t)) n = occurs t (n+2)
 occurs (IfZ _ c t1 t2) n = occurs c n || occurs t1 n || occurs t2 n
 occurs (Let _ _ _  t1 (Sc1 t2)) n = occurs t1 n || occurs t2 (n+1)
 
-mapBound :: TTerm -> TTerm
-mapBound (V i (Bound n)) = V i (Bound (max 0 (n-1)))
-mapBound v@(V _ _) = v
-mapBound c@(Const _ _) = c
-mapBound (Lam i x xty (Sc1 t)) = Lam i x xty (Sc1 $ mapBound t)
-mapBound (Print i str t) = Print i str (mapBound t)
-mapBound (App i t1 t2) = App i (mapBound t1) (mapBound t2)
-mapBound (BinaryOp i op t1 t2) = BinaryOp i op (mapBound t1) (mapBound t2)
-mapBound (Fix i f fty x xty (Sc2 t)) = Fix i f fty x xty (Sc2 $ mapBound t) 
-mapBound (IfZ i c t1 t2) = IfZ i (mapBound c) (mapBound t1) (mapBound t2)
-mapBound (Let i x ty t1 (Sc1 t2)) = Let i x ty (mapBound t1) (Sc1 $ mapBound t2)
+mapBound :: TTerm -> Int -> TTerm
+mapBound v@(V i (Bound n)) n2 = if n > n2 then V i (Bound (n-1)) else v
+mapBound v@(V _ _) _ = v
+mapBound c@(Const _ _) _ = c
+mapBound (Lam i x xty (Sc1 t)) n = Lam i x xty (Sc1 $ mapBound t (n+1)) 
+mapBound (Print i str t) n = Print i str (mapBound t n)
+mapBound (App i t1 t2) n = App i (mapBound t1 n) (mapBound t2 n)
+mapBound (BinaryOp i op t1 t2) n = BinaryOp i op (mapBound t1 n) (mapBound t2 n)
+mapBound (Fix i f fty x xty (Sc2 t)) n = Fix i f fty x xty (Sc2 $ mapBound t (n+2)) 
+mapBound (IfZ i c t1 t2) n = IfZ i (mapBound c n) (mapBound t1 n) (mapBound t2 n)
+mapBound (Let i x ty t1 (Sc1 t2)) n = Let i x ty (mapBound t1 n) (Sc1 $ mapBound t2 (n+1))
 
 inline :: MonadFD4 m => TTerm -> [Name] -> [TTerm] -> m TTerm
 inline v@(V _ _) _ _ = return v
