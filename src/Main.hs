@@ -41,6 +41,7 @@ import MonadFD4
       FD4,
       MonadFD4,
       getMode,
+      getOpt,
       setInter,
       getInter,
       printFD4,
@@ -55,6 +56,7 @@ import MonadFD4
 import CEKMachine(evalCEK)
 import TypeChecker ( tc, tcDecl )
 import Bytecompile (bytecompileModule, bcWrite, bcRead, runBC, showBC)
+import Optimizer (optimize)
 import System.FilePath (dropExtension)
 
 prompt :: String
@@ -77,9 +79,9 @@ parseMode = (,) <$>
   -- <|> flag' Assembler ( long "assembler" <> short 'a' <> help "Imprimir Assembler resultante")
   -- <|> flag' Build ( long "build" <> short 'b' <> help "Compilar")
       )
-   <*> pure False
+   -- <*> pure False
    -- reemplazar por la siguiente línea para habilitar opción
-   -- <*> flag False True (long "optimize" <> short 'o' <> help "Optimizar código")
+   <*> flag False True (long "optimize" <> short 'o' <> help "Optimizar código")
 
 -- | Parser de opciones general, consiste de un modo y una lista de archivos a procesar
 parseArgs :: Parser (Mode,Bool, [FilePath])
@@ -187,7 +189,9 @@ evalDecl d =
       t'' <- elab $ sDeclBody sd'
       xty <- typeElab p $ snd $ head $ sDeclTy sd'
       (Decl p'' x xty' tt) <- tcDecl (Decl (sDeclPos sd') (fst $ head $ sDeclTy sd') xty t'')
-      te <- evalTerm tt
+      opt <- getOpt
+      tt' <- if opt then optimize tt else return tt
+      te <- evalTerm tt'
       addDecl (Decl p'' x xty' te)
       return (Just (Decl p'' x xty' te)) 
   where
@@ -206,7 +210,9 @@ putDecl d =
       t'' <- elab $ sDeclBody sd'
       xty <- typeElab p $ snd $ head $ sDeclTy sd'
       (Decl p'' x xty' tt) <- tcDecl (Decl (sDeclPos sd') (fst $ head $ sDeclTy sd') xty t'')
-      addDecl (Decl p'' x xty' tt)
+      opt <- getOpt
+      tt' <- if opt then optimize tt else return tt
+      addDecl (Decl p'' x xty' tt')
   where
     addTyName (NatTy _) n = NatTy (Just n)
     addTyName (FunTy _ t1 t2) n = FunTy (Just n) t1 t2 
@@ -320,9 +326,11 @@ handleTerm t = do
          t' <- elab t
          s <- get
          tt <- tc t' (tyEnv s)
-         te <- evalTerm tt
+         opt <- getOpt
+         tt' <- if opt then optimize tt else return tt
+         te <- evalTerm tt'
          ppte <- pp te
-         printFD4 (ppte ++ " : " ++ ppTy (getTy tt))
+         printFD4 (ppte ++ " : " ++ ppTy (getTy tt'))
 
 printPhrase   :: MonadFD4 m => String -> m ()
 printPhrase x =

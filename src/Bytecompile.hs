@@ -138,7 +138,7 @@ bcc (V _ (Global n)) = failFD4 "Error Global"
 bcc (Const _ (CNat n)) = return [CONST,n]
 bcc (Lam _ _ _ (Sc1 t)) = do
   t' <- bct t
-  return $ [FUNCTION,length t'+1] ++ t'
+  return $ [FUNCTION,length t'] ++ t'
 bcc (App _ t1 t2) = do
   t' <- bcc t1
   t'' <- bcc t2
@@ -154,7 +154,7 @@ bcc (BinaryOp _ op t1 t2) = do
     Sub -> return $ t' ++ t'' ++ [SUB]
 bcc (Fix _ _ _ _ _ (Sc2 t)) = do
   t' <- bct t
-  return $ [FUNCTION,length t'+1] ++ t' ++ [FIX]
+  return $ [FUNCTION,length t'] ++ t' ++ [FIX]
 bcc (IfZ _ c t1 t2) = do
   c' <- bcc c
   t' <- bcc t1

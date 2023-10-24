@@ -1,0 +1,3 @@
+let f(x:Nat):Nat = x + 1
+
+let x:Nat = let g:Nat->Nat = f in f 4
