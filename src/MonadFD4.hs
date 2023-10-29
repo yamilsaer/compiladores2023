@@ -3,6 +3,8 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use <$>" #-}
+{-# LANGUAGE ConstrainedClassMethods #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {-|
 Module      : MonadFD4
@@ -18,7 +20,9 @@ y la mónada 'FD4' que provee una instancia de esta clase.
 
 module MonadFD4 (
   FD4,
+  FD4Prof,
   runFD4,
+  runFD4Prof,
   lookupDecl,
   lookupTy,
   printFD4,
@@ -28,6 +32,9 @@ module MonadFD4 (
   getInter,
   getMode,
   getOpt,
+  tick,
+  resetCount,
+  getProfile,
   eraseLastFileDecls,
   failPosFD4,
   failFD4,
@@ -48,6 +55,7 @@ import Control.Monad.State
 import Control.Monad.Except
 import Control.Monad.Reader
 import System.IO
+import Control.Monad.Catch (MonadMask, MonadCatch, MonadThrow)
 
 -- * La clase 'MonadFD4'
 
@@ -67,12 +75,19 @@ y otras operaciones derivadas de ellas, como por ejemplo
    - @gets :: (GlEnv -> a) -> m a@  
 -}
 class (MonadIO m, MonadState GlEnv m, MonadError Error m, MonadReader Conf m) => MonadFD4 m where
+    tick :: MonadFD4 m => m ()
+
+resetCount :: MonadFD4 m => m ()
+resetCount = modify (\s -> s { count = 0 })
 
 getOpt :: MonadFD4 m => m Bool
 getOpt = asks opt
 
 getMode :: MonadFD4 m => m Mode
 getMode = asks modo
+
+getProfile :: MonadFD4 m => m Bool
+getProfile = asks prof
 
 setInter :: MonadFD4 m => Bool -> m ()
 setInter b = modify (\s-> s {inter = b})
@@ -144,12 +159,25 @@ catchErrors c = catchError (Just <$> c)
 -- El transformador de mónadas @StateT GlEnv@ agrega la mónada @ExcepT Error IO@ la posibilidad de manejar un estado de tipo 'Global.GlEnv'.
 type FD4 = ReaderT Conf (StateT GlEnv (ExceptT Error IO))
 
--- | Esta es una instancia vacía, ya que 'MonadFD4' no tiene funciones miembro.
-instance MonadFD4 FD4
+newtype FD4Prof a = FD4Prof {fd4ProfMonad :: (ReaderT Conf (StateT GlEnv (ExceptT Error IO))) a}
+    deriving (Monad, Functor, Applicative, MonadReader Conf, MonadState GlEnv, MonadError Error,MonadIO,MonadMask,MonadCatch,MonadThrow)
+
+instance MonadFD4 FD4 where
+    tick = return ()
+
+instance MonadFD4 FD4Prof where
+    tick = modify (\s -> s { count = count s + 1 })
+
 
 -- 'runFD4\'' corre una computación de la mónad 'FD4' en el estado inicial 'Global.initialEnv' 
 runFD4' :: FD4 a -> Conf -> IO (Either Error (a, GlEnv))
 runFD4' c conf =  runExceptT $ runStateT (runReaderT c conf)  initialEnv
 
-runFD4:: FD4 a -> Conf -> IO (Either Error a)
+runFD4 :: FD4 a -> Conf -> IO (Either Error a)
 runFD4 c conf = fmap fst <$> runFD4' c conf
+
+runFD4Prof' :: FD4Prof a -> Conf -> IO (Either Error (a, GlEnv))
+runFD4Prof' (FD4Prof c) conf =  runExceptT $ runStateT (runReaderT c conf)  initialEnv
+
+runFD4Prof :: FD4Prof a -> Conf -> IO (Either Error a)
+runFD4Prof c conf = fmap fst <$> runFD4Prof' c conf

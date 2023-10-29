@@ -52,10 +52,10 @@ import MonadFD4
       eraseLastFileDecls,
       lookupDecl,
       catchErrors,
-      runFD4 )
+      runFD4, runFD4Prof, FD4Prof )
 import CEKMachine(evalCEK)
 import TypeChecker ( tc, tcDecl )
-import Bytecompile (bytecompileModule, bcWrite, bcRead, runBC, showBC)
+import Bytecompile (bytecompileModule, bcWrite, bcRead, runBC)
 import Optimizer (optimize)
 import System.FilePath (dropExtension)
 
@@ -65,8 +65,8 @@ prompt = "FD4> "
 
 
 -- | Parser de banderas
-parseMode :: Parser (Mode,Bool)
-parseMode = (,) <$>
+parseMode :: Parser (Mode,Bool,Bool)
+parseMode = (,,) <$>
       (flag' Typecheck ( long "typecheck" <> short 't' <> help "Chequear tipos e imprimir el término")
       <|> flag' InteractiveCEK (long "interactiveCEK" <> short 'k' <> help "Ejecutar interactivamente en la CEK")
       <|> flag' Bytecompile (long "bytecompile" <> short 'm' <> help "Compilar a la BVM")
@@ -82,10 +82,11 @@ parseMode = (,) <$>
    -- <*> pure False
    -- reemplazar por la siguiente línea para habilitar opción
    <*> flag False True (long "optimize" <> short 'o' <> help "Optimizar código")
+   <*> flag False True (long "profile" <> short 'p' <> help "Optimizar código")
 
 -- | Parser de opciones general, consiste de un modo y una lista de archivos a procesar
-parseArgs :: Parser (Mode,Bool, [FilePath])
-parseArgs = (\(a,b) c -> (a,b,c)) <$> parseMode <*> many (argument str (metavar "FILES..."))
+parseArgs :: Parser (Mode,Bool,Bool,[FilePath])
+parseArgs = (\(a,b,c) d -> (a,b,c,d)) <$> parseMode <*> many (argument str (metavar "FILES..."))
 
 main :: IO ()
 main = execParser opts >>= go
@@ -95,21 +96,41 @@ main = execParser opts >>= go
      <> progDesc "Compilador de FD4"
      <> header "Compilador de FD4 de la materia Compiladores 2023" )
 
-    go :: (Mode,Bool,[FilePath]) -> IO ()
-    go (Interactive,opt,files) =
-              runOrFail (Conf opt Interactive) (runInputT defaultSettings (repl files))
-    go (InteractiveCEK,opt,files) =
-              runOrFail (Conf opt InteractiveCEK) (runInputT defaultSettings (repl files))
-    go (Bytecompile,opt,files) =
-              runOrFail (Conf opt Bytecompile) $ mapM_ compileBytecode files
-    go (RunVM,opt,files) =
-              runOrFail (Conf opt RunVM) $ mapM_ runVM files
-    go (m,opt, files) =
-              runOrFail (Conf opt m) $ mapM_ compileFile files
+    go :: (Mode,Bool,Bool,[FilePath]) -> IO ()
+    go (Interactive,opt,False,files) =
+              runOrFail (Conf opt Interactive False) (runInputT defaultSettings (repl files))
+    go (InteractiveCEK,opt,False,files) =
+              runOrFail (Conf opt InteractiveCEK False) (runInputT defaultSettings (repl files))
+    go (Bytecompile,opt,False,files) =
+              runOrFail (Conf opt Bytecompile False) (mapM_ compileBytecode files)
+    go (RunVM,opt,False,files) =
+              runOrFail (Conf opt RunVM False) (mapM_ runVM files)
+    go (m,opt,False,files) =
+              runOrFail (Conf opt m False) (mapM_ compileFile files)
+    go (Interactive,opt,True,files) =
+              runOrFailProf (Conf opt Interactive True) (runInputT defaultSettings (repl files))
+    go (InteractiveCEK,opt,True,files) =
+              runOrFailProf (Conf opt InteractiveCEK True) (runInputT defaultSettings (repl files))
+    go (Bytecompile,opt,True,files) =
+              runOrFailProf (Conf opt Bytecompile True) (mapM_ compileBytecode files)
+    go (RunVM,opt,True,files) =
+              runOrFailProf (Conf opt RunVM True) (mapM_ runVM files)
+    go (m,opt,True,files) =
+              runOrFailProf (Conf opt m True) (mapM_ compileFile files)
+
 
 runOrFail :: Conf -> FD4 a -> IO a
 runOrFail c m = do
   r <- runFD4 m c
+  case r of
+    Left err -> do
+      liftIO $ hPrint stderr err
+      exitWith (ExitFailure 1)
+    Right v -> return v
+
+runOrFailProf :: Conf -> FD4Prof a -> IO a
+runOrFailProf c m = do
+  r <- runFD4Prof m c
   case r of
     Left err -> do
       liftIO $ hPrint stderr err
@@ -163,7 +184,6 @@ compileBytecode f = do
     mapM_ handleDecl decls
     gdecl <- gets glb
     bcode <- bytecompileModule (reverse gdecl)
-    printFD4 $ showBC bcode
     liftIO $ bcWrite bcode (dropExtension f ++ ".bc32")
     setInter i
 

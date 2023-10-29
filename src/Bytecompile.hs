@@ -16,7 +16,7 @@ module Bytecompile
  where
 
 import Lang
-import MonadFD4
+import MonadFD4 ( MonadFD4, printFD4, failFD4,tick, gets, getProfile )
 
 import qualified Data.ByteString.Lazy as BS
 import Data.Binary ( Word32, Binary(put, get), decode, encode )
@@ -25,7 +25,8 @@ import Data.Binary.Get ( getWord32le, isEmpty )
 import Subst(close)
 import Data.List (intercalate)
 import Data.Char
-
+import Control.Monad ( void, when )
+import Global
 type Opcode = Int
 type Bytecode = [Int]
 
@@ -197,7 +198,7 @@ global2Free t@(V _ _) = t
 global2Free t@(Const _ _) =  t
 global2Free (Lam i n ty (Sc1 t)) = Lam i n ty (Sc1 $ global2Free t)
 global2Free (App i t1 t2) = App i (global2Free t1) (global2Free t2)
-global2Free (Print i str t) = Print i str (global2Free t)  
+global2Free (Print i str t) = Print i str (global2Free t)
 global2Free (BinaryOp i op t1 t2) = BinaryOp i op (global2Free t1) (global2Free t2)
 global2Free (Fix i f fty x xty (Sc2 t)) = Fix i f fty x xty (Sc2 (global2Free t))
 global2Free (IfZ i c t1 t2) = IfZ i (global2Free c) (global2Free t1) (global2Free t2)
@@ -205,13 +206,13 @@ global2Free (Let i n ty t1 (Sc1 t2)) = Let i n ty (global2Free t1) (Sc1 $ global
 
 module2Term :: Module -> TTerm
 module2Term [Decl i n ty body] = global2Free body
-module2Term (Decl i n ty body:ds) = 
+module2Term (Decl i n ty body:ds) =
   let body' = module2Term ds
   in Let (i,ty) n ty body (close n $ global2Free body')
 module2Term [] = undefined
 
 bytecompileModule :: MonadFD4 m => Module -> m Bytecode
-bytecompileModule m = 
+bytecompileModule m =
   let t = module2Term m
   in do
     t' <- bcc2 t
@@ -230,42 +231,50 @@ bcRead :: FilePath -> IO Bytecode
 bcRead filename = (map fromIntegral <$> un32) . decode <$> BS.readFile filename
 
 runBC :: MonadFD4 m => Bytecode -> m ()
-runBC bc = runBC' bc [] []
+runBC bc = do
+  runBC' bc [] []
+  p <- getProfile
+  when p $ do
+    c <- gets count
+    printFD4 $ "Cantidad de operaciones ejecutadas : " ++ show c
 
 runBC' :: MonadFD4 m => Bytecode -> Env -> [Val] -> m ()
-runBC' (STOP:_) _ _ = return ()
-runBC' (CONST:n:bs) e s = runBC' bs e (I n:s)
-runBC' (SUB:bs) e (I x1:I x2:s) = 
+runBC' (STOP:_) _ _ = void tick
+runBC' (CONST:n:bs) e s = tick >> runBC' bs e (I n:s)
+runBC' (SUB:bs) e (I x1:I x2:s) =
   let res = max 0 (x2-x1)
-  in runBC' bs e (I res:s)
-runBC' (ADD:bs) e ((I x1):(I x2):s) = runBC' bs e (I (x2+x1):s)
-runBC' (ACCESS:i:bs) e s = runBC' bs e ((e!!i):s)
-runBC' (CALL:bs) e (v:(Fun e' bs'):s) = runBC' bs' (v:e') (RA e bs:s)
+  in tick >> runBC' bs e (I res:s)
+runBC' (ADD:bs) e ((I x1):(I x2):s) = tick >> runBC' bs e (I (x2+x1):s)
+runBC' (ACCESS:i:bs) e s = tick >> runBC' bs e ((e!!i):s)
+runBC' (CALL:bs) e (v:(Fun e' bs'):s) = tick >> runBC' bs' (v:e') (RA e bs:s)
 runBC' (FUNCTION:n:bs) e s =
   let (cf,c) = splitAt n bs
-  in runBC' c e (Fun e cf:s)
-runBC' (RETURN:_) _ (v:(RA e bs):s) = runBC' bs e (v:s)
-runBC' (SHIFT:bs) e (v:s) = runBC' bs (v:e) s
-runBC' (DROP:bs) (v:e) s = runBC' bs e s
-runBC' (JUMP:n:bs) e s = 
-  let bs' = drop n bs 
-  in runBC' bs' e s
+  in tick >> runBC' c e (Fun e cf:s)
+runBC' (RETURN:_) _ (v:(RA e bs):s) = tick >> runBC' bs e (v:s)
+runBC' (SHIFT:bs) e (v:s) = tick >> runBC' bs (v:e) s
+runBC' (DROP:bs) (v:e) s = tick >> runBC' bs e s
+runBC' (JUMP:n:bs) e s =
+  let bs' = drop n bs
+  in tick >> runBC' bs' e s
 runBC' (PRINTN:bs) e ((I n):s) = do
     printFD4 (show n)
+    tick
     runBC' bs e (I n:s)
 runBC' (PRINT:bs) e ((I n):s) =
   let (str,bs') = span (/= NULL) bs
       str' = bc2string str
   in do
     printFD4 (str'++show n)
+    tick
+    tick
     runBC' (drop 2 bs') e (I n:s)
-runBC' (FIX:bs) e (Fun _ cf:s) = 
+runBC' (FIX:bs) e (Fun _ cf:s) =
   let efix = Fun efix cf : e
-  in runBC' bs e (Fun efix cf:s)
+  in tick >> runBC' bs e (Fun efix cf:s)
 runBC' (CJUMP:n:bs) e (I m:s) = if m == 0
-  then runBC' bs e s
-  else runBC' (drop n bs) e s
-runBC' (TAILCALL:bs) _ (v:Fun e' bs':s) = runBC' bs' (v:e') s
-runBC' (SDROP:bs) e (v:s) = runBC' bs e s
+  then tick >> runBC' bs e s
+  else tick >> runBC' (drop n bs) e s
+runBC' (TAILCALL:bs) _ (v:Fun e' bs':s) = tick >> runBC' bs' (v:e') s
+runBC' (SDROP:bs) e (v:s) = tick >> runBC' bs e s
 runBC' (b:_) _ _ = failFD4 $ "Instrucción inválida: " ++ show b
 runBC' _ _ _ = failFD4 "Error inesperado"

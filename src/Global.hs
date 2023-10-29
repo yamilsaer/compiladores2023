@@ -18,7 +18,8 @@ data GlEnv = GlEnv {
   lfile :: String,      -- ^ Último archivo cargado.
   cantDecl :: Int,      -- ^ Cantidad de declaraciones desde la última carga
   glb :: [Decl TTerm],  -- ^ Entorno con declaraciones globales
-  sType :: [(Name,Ty)] -- Entorno de tipos superficiales.
+  sType :: [(Name,Ty)], -- Entorno de tipos superficiales.
+  count :: Int
 }
 
 -- ^ Entorno de tipado de declaraciones globales
@@ -42,9 +43,10 @@ data Mode =
   -- | Build
 data Conf = Conf {
     opt :: Bool,          --  ^ True, si estan habilitadas las optimizaciones.
-    modo :: Mode
+    modo :: Mode,
+    prof :: Bool
 }
 
 -- | Valor del estado inicial
 initialEnv :: GlEnv
-initialEnv = GlEnv False "" 0 [] []
+initialEnv = GlEnv False "" 0 [] [] 0
