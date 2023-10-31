@@ -197,14 +197,12 @@ inline (Lam i x ty (Sc1 t)) ns env = do
     return $ Lam i x ty (Sc1 t') 
 inline (Print i str t) ns env = do
     t' <- inline t ns env
-    return $ Print i str t
+    return $ Print i str t'
 inline (BinaryOp i op t1 t2) ns env = do
     t1' <- inline t1 ns env
     t2' <- inline t2 ns env
     return $ BinaryOp i op t1' t2'
-inline (Fix i f fty x xty (Sc2 t)) ns env = do
-    t' <- inline t (x:f:ns) env
-    return $ Fix i f fty x xty (Sc2 t')
+inline fx@(Fix i f fty x xty (Sc2 t)) ns env = return fx
 inline (IfZ i c t1 t2) ns env = do
     c' <- inline c ns env
     t1' <- inline t1 ns env
@@ -218,7 +216,7 @@ inline (App i v@(V _ (Global n)) t) ns env = do
     mtm <- lookupDecl n
     case mtm of
         Nothing -> failFD4 $ "Error de ejecución: variable no declarada: " ++ ppName n
-        Just d -> if termHeuristic d > COST then do
+        Just d -> if termHeuristic d > COST || isFix d then do
             t' <- inline t ns env
             return $ App i v t'
             else let decl = getScope d in case t of
@@ -227,10 +225,11 @@ inline (App i v@(V _ (Global n)) t) ns env = do
                 _ -> let z = freshen ns n
                          zty = snd $ getInfo t in do
                     inline (Let i z zty t (Sc1 decl)) (z:ns) (t:env)
-inline (App i v@(V _ (Bound idx)) t) ns env = if termHeuristic (env !! idx) > COST then do
-    t' <- inline t ns env
-    return $ App i v t'
-    else let t' = getScope $ env !! idx in do
+inline (App i v@(V _ (Bound idx)) t) ns env = let d = env !! idx in 
+    if termHeuristic d > COST  || isFix d then do
+        t' <- inline t ns env
+        return $ App i v t'
+    else let t' = getScope d in do
     case t of
         (V _ _) -> inline (subst t (Sc1 t')) ns env
         (Const _ _) -> inline (subst t (Sc1 t')) ns env
@@ -244,8 +243,12 @@ inline (App i t1 t2) ns env = do
 
 getScope :: TTerm -> TTerm
 getScope (Lam _ _ _ (Sc1 t)) = t
-getScope (Fix _ _ _ _ _ (Sc2 t)) =t
+getScope (Fix _ _ _ _ _ (Sc2 t)) = t
 getScope t = t
+
+isFix :: TTerm -> Bool
+isFix (Fix _ _ _ _ _ _) = True
+isFix t = False
 
 termHeuristic :: TTerm -> Int
 termHeuristic (V _ _) = 0

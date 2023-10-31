@@ -33,6 +33,8 @@ module MonadFD4 (
   getMode,
   getOpt,
   tick,
+  addClos,
+  updateStackSize,
   resetCount,
   getProfile,
   eraseLastFileDecls,
@@ -76,6 +78,8 @@ y otras operaciones derivadas de ellas, como por ejemplo
 -}
 class (MonadIO m, MonadState GlEnv m, MonadError Error m, MonadReader Conf m) => MonadFD4 m where
     tick :: MonadFD4 m => m ()
+    addClos :: MonadFD4 m => m ()
+    updateStackSize :: MonadFD4 m => [a] -> m ()
 
 resetCount :: MonadFD4 m => m ()
 resetCount = modify (\s -> s { count = 0 })
@@ -159,15 +163,18 @@ catchErrors c = catchError (Just <$> c)
 -- El transformador de mónadas @StateT GlEnv@ agrega la mónada @ExcepT Error IO@ la posibilidad de manejar un estado de tipo 'Global.GlEnv'.
 type FD4 = ReaderT Conf (StateT GlEnv (ExceptT Error IO))
 
-newtype FD4Prof a = FD4Prof {fd4ProfMonad :: (ReaderT Conf (StateT GlEnv (ExceptT Error IO))) a}
+newtype FD4Prof a = FD4Prof {fd4ProfMonad :: FD4 a}
     deriving (Monad, Functor, Applicative, MonadReader Conf, MonadState GlEnv, MonadError Error,MonadIO,MonadMask,MonadCatch,MonadThrow)
 
 instance MonadFD4 FD4 where
     tick = return ()
+    updateStackSize _ = return ()
+    addClos = return ()
 
 instance MonadFD4 FD4Prof where
     tick = modify (\s -> s { count = count s + 1 })
-
+    updateStackSize xs = modify (\s -> s { stackSize = max (length xs) (stackSize s) })
+    addClos = modify (\s -> s { numClosures = numClosures s + 1 })
 
 -- 'runFD4\'' corre una computación de la mónad 'FD4' en el estado inicial 'Global.initialEnv' 
 runFD4' :: FD4 a -> Conf -> IO (Either Error (a, GlEnv))
