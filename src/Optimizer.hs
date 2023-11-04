@@ -30,7 +30,7 @@ optimizer t = do
     t2 <- consFolding t1
     t3 <- inline t2 [] []
     deadCode t3
-    
+
 consFolding :: MonadFD4 m => TTerm -> m TTerm
 consFolding v@(V _ _) = return v
 consFolding c@(Const _ _) = return c
@@ -60,20 +60,20 @@ consFolding (Let i x xty def (Sc1 body)) = do
     def' <- consFolding def
     body' <- consFolding body
     return $ Let i x xty def' (Sc1 body')
-consFolding (BinaryOp i Sub t1 t2) = do 
+consFolding (BinaryOp i Sub t1 t2) = do
     t1' <- consFolding t1
     t2' <- consFolding t2
     case t1' of
-        Const i2 (CNat 0) -> if hasPrint t2' 
+        Const i2 (CNat 0) -> if hasPrint t2'
             then return $ BinaryOp i Sub t1' t2'
             else return $ Const i2 (CNat 0)
         Const _ (CNat n1) -> case t2' of
             Const _ (CNat n2) -> return $ Const i (CNat $ max 0 (n1-n2))
             _ -> return $ BinaryOp i Sub t1' t2'
-        _ -> case t2' of 
+        _ -> case t2' of
             Const _ (CNat 0) -> return t1'
             _ -> return $ BinaryOp i Sub t1' t2'
-consFolding (BinaryOp i Add t1 t2) = do 
+consFolding (BinaryOp i Add t1 t2) = do
     t1' <- consFolding t1
     t2' <- consFolding t2
     case t1' of
@@ -81,7 +81,7 @@ consFolding (BinaryOp i Add t1 t2) = do
         Const _ (CNat n1) -> case t2' of
             Const _ (CNat n2) -> return $ Const i (CNat $ n1+n2)
             _ -> return $ BinaryOp i Add t1' t2'
-        _ -> case t2' of 
+        _ -> case t2' of
             Const _ (CNat 0) -> return t1'
             _ -> return $ BinaryOp i Add t1' t2'
 
@@ -105,18 +105,18 @@ consPropagation (IfZ i c t0 t1) = do
     c' <- consPropagation c
     t0' <- consPropagation t0
     t1' <- consPropagation t1
-    return $ IfZ i c' t0' t1' 
+    return $ IfZ i c' t0' t1'
 consPropagation (Let i x xty def (Sc1 body)) = do
     def' <- consPropagation def
     case def' of
-        Const i2 c -> let body' = subst (Const i2 c) (Sc1 body) in 
+        Const i2 c -> let body' = subst (Const i2 c) (Sc1 body) in
             do
             body'' <- consPropagation body'
             return $ Let i x xty def' (Sc1 body')
         t -> do
             body' <- consPropagation body
             return $ Let i x xty def' (Sc1 body')
-consPropagation (BinaryOp i op t1 t2) = do 
+consPropagation (BinaryOp i op t1 t2) = do
     t1' <- consPropagation t1
     t2' <- consPropagation t2
     return $ BinaryOp i op t1' t2'
@@ -125,7 +125,7 @@ deadCode :: MonadFD4 m =>  TTerm -> m TTerm
 deadCode v@(V _ _) = return v
 deadCode c@(Const _ _) = return c
 deadCode (Lam i n ty (Sc1 t)) = do
-    t' <- deadCode t 
+    t' <- deadCode t
     return $ Lam i n ty (Sc1 t')
 deadCode (App i t1 t2) = do
     t1' <- deadCode t1
@@ -141,7 +141,7 @@ deadCode (IfZ i c t0 t1) = do
     c' <- deadCode c
     t0' <- deadCode t0
     t1' <- deadCode t1
-    return $ IfZ i c' t0' t1' 
+    return $ IfZ i c' t0' t1'
 deadCode (Let i x xty def (Sc1 body)) = do
     if not (hasPrint def) && not (occurs body 0) then
         deadCode $ mapBound body 0
@@ -149,7 +149,7 @@ deadCode (Let i x xty def (Sc1 body)) = do
         def' <- deadCode def
         body' <- deadCode body
         return $ Let i x xty def' (Sc1 body')
-deadCode (BinaryOp i op t1 t2) = do 
+deadCode (BinaryOp i op t1 t2) = do
     t1' <- deadCode t1
     t2' <- deadCode t2
     return $ BinaryOp i op t1' t2'
@@ -169,7 +169,7 @@ occurs :: TTerm -> Int -> Bool
 occurs (V _ (Bound n1)) n2 = n1 == n2
 occurs (V _ _ ) _ = False
 occurs (Const _ _) _ = False
-occurs (Lam _ _ _ (Sc1 t)) n = occurs t (n+1) 
+occurs (Lam _ _ _ (Sc1 t)) n = occurs t (n+1)
 occurs (App _ t1 t2) n = occurs t1 n || occurs t2 n
 occurs (Print _ _ t) n = occurs t n
 occurs (BinaryOp _ _ t1 t2) n = occurs t1 n || occurs t2 n
@@ -181,11 +181,11 @@ mapBound :: TTerm -> Int -> TTerm
 mapBound v@(V i (Bound n)) n2 = if n > n2 then V i (Bound (n-1)) else v
 mapBound v@(V _ _) _ = v
 mapBound c@(Const _ _) _ = c
-mapBound (Lam i x xty (Sc1 t)) n = Lam i x xty (Sc1 $ mapBound t (n+1)) 
+mapBound (Lam i x xty (Sc1 t)) n = Lam i x xty (Sc1 $ mapBound t (n+1))
 mapBound (Print i str t) n = Print i str (mapBound t n)
 mapBound (App i t1 t2) n = App i (mapBound t1 n) (mapBound t2 n)
 mapBound (BinaryOp i op t1 t2) n = BinaryOp i op (mapBound t1 n) (mapBound t2 n)
-mapBound (Fix i f fty x xty (Sc2 t)) n = Fix i f fty x xty (Sc2 $ mapBound t (n+2)) 
+mapBound (Fix i f fty x xty (Sc2 t)) n = Fix i f fty x xty (Sc2 $ mapBound t (n+2))
 mapBound (IfZ i c t1 t2) n = IfZ i (mapBound c n) (mapBound t1 n) (mapBound t2 n)
 mapBound (Let i x ty t1 (Sc1 t2)) n = Let i x ty (mapBound t1 n) (Sc1 $ mapBound t2 (n+1))
 
@@ -194,7 +194,7 @@ inline v@(V _ _) _ _ = return v
 inline c@(Const _ _ ) _ _ = return c
 inline (Lam i x ty (Sc1 t)) ns env = do
     t' <- inline t (x:ns) env
-    return $ Lam i x ty (Sc1 t') 
+    return $ Lam i x ty (Sc1 t')
 inline (Print i str t) ns env = do
     t' <- inline t ns env
     return $ Print i str t'
@@ -225,7 +225,7 @@ inline (App i v@(V _ (Global n)) t) ns env = do
                 _ -> let z = freshen ns n
                          zty = snd $ getInfo t in do
                     inline (Let i z zty t (Sc1 decl)) (z:ns) (t:env)
-inline (App i v@(V _ (Bound idx)) t) ns env = let d = env !! idx in 
+inline (App i v@(V _ (Bound idx)) t) ns env = let d = env !! idx in
     if termHeuristic d > COST  || isFix d then do
         t' <- inline t ns env
         return $ App i v t'
@@ -247,14 +247,14 @@ getScope (Fix _ _ _ _ _ (Sc2 t)) = t
 getScope t = t
 
 isFix :: TTerm -> Bool
-isFix (Fix _ _ _ _ _ _) = True
+isFix (Fix {}) = True
 isFix t = False
 
 termHeuristic :: TTerm -> Int
 termHeuristic (V _ _) = 0
 termHeuristic (Const _ _) = 0
 termHeuristic (BinaryOp _ _ t1 t2) = 1 + termHeuristic t1 + termHeuristic t2
-termHeuristic (Print _ _ t) = 1 + termHeuristic t 
+termHeuristic (Print _ _ t) = 1 + termHeuristic t
 termHeuristic (Lam _ _ _ (Sc1 t)) = 1 + termHeuristic t
 termHeuristic (App _ t1 t2) = 1 + termHeuristic t1 + termHeuristic t2
 termHeuristic (IfZ _ c t1 t2) = termHeuristic c + termHeuristic t1 + termHeuristic t2 + 1
