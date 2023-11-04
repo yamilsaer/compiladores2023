@@ -244,7 +244,7 @@ inline (App i t1 t2) ns env = do
 
 getScope :: TTerm -> TTerm
 getScope (Lam _ _ _ (Sc1 t)) = t
-getScope (Fix _ _ _ _ _ (Sc2 t)) =t
+getScope (Fix _ _ _ _ _ (Sc2 t)) = t
 getScope t = t
 
 termHeuristic :: TTerm -> Int
@@ -257,3 +257,25 @@ termHeuristic (App _ t1 t2) = 1 + termHeuristic t1 + termHeuristic t2
 termHeuristic (IfZ _ c t1 t2) = termHeuristic c + termHeuristic t1 + termHeuristic t2 + 1
 termHeuristic (Fix _ _ _ _ _ (Sc2 t)) = 1 + termHeuristic t
 termHeuristic (Let _ _ _ t1 (Sc1 t2)) = 1 + termHeuristic t1 + termHeuristic t2
+
+
+-- getArgs :: TTerm -> Int -> [Int]
+-- getArgs (Lam _ _ _ (Sc1 t)) = getArgs' t []
+-- getArgs t = []
+
+--getArgs' :: TTerm -> [Int] -> [Int] 
+
+-- isInvariant :: TTerm -> Int -> Name -> Bool
+-- isInvariant (V _ _) _  _ = True
+-- isInvariant (Const _ _) _  _ = True
+-- isInvariant (BinaryOp _ _ t1 t2) idx = case t1 of
+--     (V _ (Bound i)) -> (i /= idx) && isInvariant t2 idx
+--     _ -> case t2 of
+--         (V _ (Bound i)) -> (i /= idx) && isInvariant t1 idx
+--         _ -> isInvariant t1 idx && isInvariant t2 idx
+-- isInvariant (Print _ _ t) idx = isInvariant t idx
+-- isInvariant (Lam _ _ _ (Sc1 t)) idx = 1 + isInvariant t
+-- isInvariant = 1 +isInvariant t1 + isInvariant t2
+-- isInvariant (IfZ _ c t1 t2) = isInvariant c + isInvariant t1 + isInvariant t2 + 1
+-- isInvariant (Fix _ _ _ _ _ (Sc2 t)) = 1 + isInvariant t
+-- isInvariant (Let _ _ _ t1 (Sc1 t2)) = 1 + isInvariant t1 + isInvariant t2

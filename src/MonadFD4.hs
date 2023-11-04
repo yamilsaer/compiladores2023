@@ -160,7 +160,7 @@ catchErrors c = catchError (Just <$> c)
 type FD4 = ReaderT Conf (StateT GlEnv (ExceptT Error IO))
 
 newtype FD4Prof a = FD4Prof {fd4ProfMonad :: (ReaderT Conf (StateT GlEnv (ExceptT Error IO))) a}
-    deriving (Monad, Functor, Applicative, MonadReader Conf, MonadState GlEnv, MonadError Error,MonadIO,MonadMask,MonadCatch,MonadThrow)
+    deriving (Monad, Functor, Applicative, MonadReader Conf, MonadState GlEnv, MonadError Error, MonadIO, MonadMask, MonadCatch, MonadThrow)
 
 instance MonadFD4 FD4 where
     tick = return ()
@@ -177,7 +177,7 @@ runFD4 :: FD4 a -> Conf -> IO (Either Error a)
 runFD4 c conf = fmap fst <$> runFD4' c conf
 
 runFD4Prof' :: FD4Prof a -> Conf -> IO (Either Error (a, GlEnv))
-runFD4Prof' (FD4Prof c) conf =  runExceptT $ runStateT (runReaderT c conf)  initialEnv
+runFD4Prof' (FD4Prof c) conf =  runExceptT $ runStateT (runReaderT c conf) initialEnv
 
 runFD4Prof :: FD4Prof a -> Conf -> IO (Either Error a)
 runFD4Prof c conf = fmap fst <$> runFD4Prof' c conf
