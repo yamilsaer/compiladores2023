@@ -16,7 +16,7 @@ module Bytecompile
  where
 
 import Lang
-import MonadFD4 ( MonadFD4, printFD4, failFD4,tick, gets, getProfile )
+import MonadFD4 ( MonadFD4, printFD4, failFD4,tick, addClos, updateStackSize, gets, getProfile )
 
 import qualified Data.ByteString.Lazy as BS
 import Data.Binary ( Word32, Binary(put, get), decode, encode )
@@ -236,20 +236,24 @@ runBC bc = do
   p <- getProfile
   when p $ do
     c <- gets count
+    st <- gets stackSize
+    clos <- gets numClosures
     printFD4 $ "Cantidad de operaciones ejecutadas : " ++ show c
+    printFD4 $ "Tamano maximo del stack : " ++ show st
+    printFD4 $ "Cantidad de clausuras creadas : " ++ show clos
 
 runBC' :: MonadFD4 m => Bytecode -> Env -> [Val] -> m ()
 runBC' (STOP:_) _ _ = void tick
-runBC' (CONST:n:bs) e s = tick >> runBC' bs e (I n:s)
+runBC' (CONST:n:bs) e s = tick >> updateStackSize (I n:s) >> runBC' bs e (I n:s)
 runBC' (SUB:bs) e (I x1:I x2:s) =
   let res = max 0 (x2-x1)
-  in tick >> runBC' bs e (I res:s)
+  in tick >> updateStackSize (I res:s) >>  runBC' bs e (I res:s)
 runBC' (ADD:bs) e ((I x1):(I x2):s) = tick >> runBC' bs e (I (x2+x1):s)
-runBC' (ACCESS:i:bs) e s = tick >> runBC' bs e ((e!!i):s)
-runBC' (CALL:bs) e (v:(Fun e' bs'):s) = tick >> runBC' bs' (v:e') (RA e bs:s)
+runBC' (ACCESS:i:bs) e s = tick >> updateStackSize ((e!!i):s) >> runBC' bs e ((e!!i):s)
+runBC' (CALL:bs) e (v:(Fun e' bs'):s) = tick >> updateStackSize (RA e bs:s) >> runBC' bs' (v:e') (RA e bs:s)
 runBC' (FUNCTION:n:bs) e s =
   let (cf,c) = splitAt n bs
-  in tick >> runBC' c e (Fun e cf:s)
+  in tick >> addClos >> updateStackSize (Fun e cf:s) >> runBC' c e (Fun e cf:s)
 runBC' (RETURN:_) _ (v:(RA e bs):s) = tick >> runBC' bs e (v:s)
 runBC' (SHIFT:bs) e (v:s) = tick >> runBC' bs (v:e) s
 runBC' (DROP:bs) (v:e) s = tick >> runBC' bs e s
@@ -270,7 +274,7 @@ runBC' (PRINT:bs) e ((I n):s) =
     runBC' (drop 2 bs') e (I n:s)
 runBC' (FIX:bs) e (Fun _ cf:s) =
   let efix = Fun efix cf : e
-  in tick >> runBC' bs e (Fun efix cf:s)
+  in tick >> addClos >> runBC' bs e (Fun efix cf:s)
 runBC' (CJUMP:n:bs) e (I m:s) = if m == 0
   then tick >> runBC' bs e s
   else tick >> runBC' (drop n bs) e s

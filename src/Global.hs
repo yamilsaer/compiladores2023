@@ -19,7 +19,9 @@ data GlEnv = GlEnv {
   cantDecl :: Int,      -- ^ Cantidad de declaraciones desde la última carga
   glb :: [Decl TTerm],  -- ^ Entorno con declaraciones globales
   sType :: [(Name,Ty)], -- Entorno de tipos superficiales.
-  count :: Int
+  count :: Int,
+  stackSize :: Int,
+  numClosures :: Int
 }
 
 -- ^ Entorno de tipado de declaraciones globales
@@ -49,4 +51,4 @@ data Conf = Conf {
 
 -- | Valor del estado inicial
 initialEnv :: GlEnv
-initialEnv = GlEnv False "" 0 [] [] 0
+initialEnv = GlEnv False "" 0 [] [] 0 0 0
