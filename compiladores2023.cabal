@@ -40,7 +40,9 @@ executable compiladores2023
         CEKMachine
         Bytecompile
         Optimizer
-
+        C
+        IR
+        ClosureConvert
     ghc-options: 
         -threaded 
         -rtsopts 

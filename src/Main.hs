@@ -57,6 +57,7 @@ import CEKMachine(evalCEK)
 import TypeChecker ( tc, tcDecl )
 import Bytecompile (bytecompileModule, bcWrite, bcRead, runBC)
 import Optimizer (optimize)
+import ClosureConvert (ir2C2)
 import System.FilePath (dropExtension)
 
 prompt :: String
@@ -74,7 +75,7 @@ parseMode = (,,) <$>
       <|> flag Interactive Interactive ( long "interactive" <> short 'i' <> help "Ejecutar en forma interactiva")
       <|> flag Eval        Eval        (long "eval" <> short 'e' <> help "Evaluar programa")
       <|> flag EvalCEK     EvalCEK     (long "cek" <> short 'v' <> help "Evaluar programa en la CEK")
-  -- <|> flag' CC ( long "cc" <> short 'c' <> help "Compilar a código C")
+      <|> flag' CC ( long "cc" <> short 'c' <> help "Compilar a código C")
   -- <|> flag' Canon ( long "canon" <> short 'n' <> help "Imprimir canonicalización")
   -- <|> flag' Assembler ( long "assembler" <> short 'a' <> help "Imprimir Assembler resultante")
   -- <|> flag' Build ( long "build" <> short 'b' <> help "Compilar")
@@ -105,6 +106,8 @@ main = execParser opts >>= go
               runOrFail (Conf opt Bytecompile False) (mapM_ compileBytecode files)
     go (RunVM,opt,False,files) =
               runOrFail (Conf opt RunVM False) (mapM_ runVM files)
+    go (CC,opt,False,files) =
+              runOrFailProf (Conf opt CC False) (mapM_ compileCC files)
     go (m,opt,False,files) =
               runOrFail (Conf opt m False) (mapM_ compileFile files)
     go (Interactive,opt,True,files) =
@@ -115,6 +118,8 @@ main = execParser opts >>= go
               runOrFailProf (Conf opt Bytecompile True) (mapM_ compileBytecode files)
     go (RunVM,opt,True,files) =
               runOrFailProf (Conf opt RunVM True) (mapM_ runVM files)
+    go (CC,opt,True,files) =
+              runOrFailProf (Conf opt CC True) (mapM_ compileCC files)
     go (m,opt,True,files) =
               runOrFailProf (Conf opt m True) (mapM_ compileFile files)
 
@@ -187,6 +192,17 @@ compileBytecode f = do
     liftIO $ bcWrite bcode (dropExtension f ++ ".bc32")
     setInter i
 
+compileCC :: MonadFD4 m => FilePath -> m ()
+compileCC f = do
+    i <- getInter
+    setInter False
+    when i $ printFD4 ("Abriendo "++f++"...")
+    decls <- loadFile f
+    mapM_ handleDecl decls
+    gdecl <- gets glb
+    ir2C2 (reverse gdecl)
+    setInter i
+
 runVM :: MonadFD4 m => FilePath -> m ()
 runVM f = do
   bc <- liftIO $ bcRead f
@@ -257,6 +273,7 @@ handleDecl d = do
           EvalCEK -> void (evalDecl d)
           Bytecompile -> putDecl d
           RunVM -> return ()
+          CC -> putDecl d
   
              
 data Command = Compile CompileForm
@@ -386,4 +403,5 @@ evalTerm t = do
     Eval -> eval t
     Typecheck -> eval t
     EvalCEK -> evalCEK t
+    CC -> eval t
     _ -> eval t
