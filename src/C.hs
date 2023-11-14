@@ -61,7 +61,7 @@ cast :: IrTy -> Doc a -> Doc a
 cast ty d = parens (ty2doc ty) <> parens d
 
 ir2doc :: Ir -> Doc a
-ir2doc (IrVar n) = name n
+ir2doc (IrVar n _) = name n
 ir2doc (IrGlobal n) = name n
 ir2doc (IrCall f args ty) = cast ty (parens (funcast <+> ir2doc f) <> -- func
                                       tupled (map (\a -> voidptr <> ir2doc a) args)) -- args

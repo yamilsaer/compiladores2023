@@ -1,10 +1,9 @@
 module IR where
 
 import Lang ( Name, Const, BinaryOp )
-import Control.Monad.Writer (Writer,runWriter)
-import Control.Monad.State (StateT (runStateT))
+import Control.Monad.State.Lazy (State,runState)
 
-data Ir = IrVar Name
+data Ir = IrVar Name IrTy
         | IrGlobal Name
         | IrCall Ir [Ir] IrTy
                         -- ^ Tipo de expr final
@@ -43,8 +42,19 @@ instance Show IrDecls where
   show (IrDecls decls) =
    concatMap (\d -> show d ++ "\n") decls
 
-type IR = StateT Int (Writer [IrDecl])
+type IR = State StateIr
 
-runIR :: IR a -> (a,[IrDecl])
-runIR c = let ((result, state), d) = runWriter (runStateT c 0)
-          in (result, d)
+data StateIr = StateIr { 
+
+  freshIndex :: Int,
+  idecls :: [IrDecl],
+  freshName :: Name,
+  lastVar :: [Ir], -- Lista de variables libres
+  lastClosure :: Name -- Nombre de la ultima clausura
+}
+
+runIR :: IR a -> Name -> (a,StateIr)
+runIR c n = runState c (initState n)
+
+initState :: Name -> StateIr
+initState n = StateIr 0 [] n [] ""
