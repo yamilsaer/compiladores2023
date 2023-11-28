@@ -99,12 +99,6 @@ valueToTerm (C (CFix fty' (v:vs) f fty n ty t)) d = do
     v' <- valueToTerm v 0
     replaceBound t' v' d
 
--- valueToTerm :: MonadFD4 m => Value -> m TTerm
--- valueToTerm (Vm n) = return (Const (NoPos,NatTy Nothing) (CNat n))
--- valueToTerm (C (CFun fty _ n ty t)) = do
---     return (Lam (NoPos,fty) n ty (Sc1 t))
--- valueToTerm (C (CFix fty' _ f fty n ty t)) = return (Fix (NoPos,fty') f fty n ty (Sc2 t))
-
 evalCEK :: MonadFD4 m => TTerm -> m TTerm
 evalCEK t = do
       v <- seek t [] []

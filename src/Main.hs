@@ -103,25 +103,25 @@ main = execParser opts >>= go
     go (InteractiveCEK,opt,False,files) =
               runOrFail (Conf opt InteractiveCEK False) (runInputT defaultSettings (repl files))
     go (Bytecompile,opt,False,files) =
-              runOrFail (Conf opt Bytecompile False) (mapM_ compileBytecode files)
+              runOrFail (Conf opt Bytecompile False) (mapM_ compile files)
     go (RunVM,opt,False,files) =
               runOrFail (Conf opt RunVM False) (mapM_ runVM files)
     go (CC,opt,False,files) =
-              runOrFailProf (Conf opt CC False) (mapM_ compileCC files)
+              runOrFailProf (Conf opt CC False) (mapM_ compile files)
     go (m,opt,False,files) =
-              runOrFail (Conf opt m False) (mapM_ compileFile files)
+              runOrFail (Conf opt m False) (mapM_ compile files)
     go (Interactive,opt,True,files) =
               runOrFailProf (Conf opt Interactive True) (runInputT defaultSettings (repl files))
     go (InteractiveCEK,opt,True,files) =
               runOrFailProf (Conf opt InteractiveCEK True) (runInputT defaultSettings (repl files))
     go (Bytecompile,opt,True,files) =
-              runOrFailProf (Conf opt Bytecompile True) (mapM_ compileBytecode files)
+              runOrFailProf (Conf opt Bytecompile True) (mapM_ compile files)
     go (RunVM,opt,True,files) =
               runOrFailProf (Conf opt RunVM True) (mapM_ runVM files)
     go (CC,opt,True,files) =
-              runOrFailProf (Conf opt CC True) (mapM_ compileCC files)
+              runOrFailProf (Conf opt CC True) (mapM_ compile files)
     go (m,opt,True,files) =
-              runOrFailProf (Conf opt m True) (mapM_ compileFile files)
+              runOrFailProf (Conf opt m True) (mapM_ compile files)
 
 
 runOrFail :: Conf -> FD4 a -> IO a
@@ -145,7 +145,7 @@ runOrFailProf c m = do
 repl :: (MonadFD4 m, MonadMask m) => [FilePath] -> InputT m ()
 repl args = do
        lift $ setInter True
-       lift $ catchErrors $ mapM_ compileFile args
+       lift $ catchErrors $ mapM_ compile args
        s <- lift get
        when (inter s) $ liftIO $ putStrLn
          (  "Entorno interactivo para FD4.\n"
@@ -171,37 +171,24 @@ loadFile f = do
     setLastFile filename
     parseIO filename program x
 
-compileFile ::  MonadFD4 m => FilePath -> m ()
-compileFile f = do
+compile :: MonadFD4 m => FilePath -> m ()
+compile f = do
     i <- getInter
     setInter False
     when i $ printFD4 ("Abriendo "++f++"...")
     decls <- loadFile f
     mapM_ handleDecl decls
-    setInter i
-
-compileBytecode :: MonadFD4 m => FilePath -> m ()
-compileBytecode f = do
-    i <- getInter
-    setInter False
-    when i $ printFD4 ("Abriendo "++f++"...")
-    decls <- loadFile f
-    mapM_ handleDecl decls
-    gdecl <- gets glb
-    bcode <- bytecompileModule (reverse gdecl)
-    liftIO $ bcWrite bcode (dropExtension f ++ ".bc32")
-    setInter i
-
-compileCC :: MonadFD4 m => FilePath -> m ()
-compileCC f = do
-    i <- getInter
-    setInter False
-    when i $ printFD4 ("Abriendo "++f++"...")
-    decls <- loadFile f
-    mapM_ handleDecl decls
-    gdecl <- gets glb
-    ir2C2 (reverse gdecl)
-    setInter i
+    m <- getMode
+    case m of 
+      Bytecompile -> do gdecl <- gets glb
+                        bcode <- bytecompileModule (reverse gdecl)
+                        liftIO $ bcWrite bcode (dropExtension f ++ ".bc32")
+                        setInter i
+      CC -> do gdecl <- gets glb
+               code <- ir2C2 (reverse gdecl)
+               liftIO $ writeFile (dropExtension f ++ ".c") code
+               setInter i
+      _ -> setInter i
 
 runVM :: MonadFD4 m => FilePath -> m ()
 runVM f = do
@@ -345,9 +332,9 @@ handleCommand cmd = do
        Compile c ->
                   do  case c of
                           CompileInteractive e -> compilePhrase e
-                          CompileFile f        -> compileFile f
+                          CompileFile f        -> compile f
                       return True
-       Reload ->  eraseLastFileDecls >> (getLastFile >>= compileFile) >> return True
+       Reload ->  eraseLastFileDecls >> (getLastFile >>= compile) >> return True
        PPrint e   -> printPhrase e >> return True
        Type e    -> typeCheckPhrase e >> return True
 

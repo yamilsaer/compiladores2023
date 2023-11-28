@@ -2,7 +2,7 @@ module ClosureConvert where
 
 import IR
 import Lang
-import MonadFD4 ( gets, modify, printFD4, MonadFD4 )
+import MonadFD4 ( gets, modify, MonadFD4 )
 import C (ir2C)
 import PPrint (freshen)
 import Data.List (find)
@@ -27,7 +27,6 @@ closureConvert f@(Lam _ x ty (Sc1 t)) = let ns = getFreeVars f in do
     modify (\s -> s {idecls = idecls s ++ [decl]})
     return $ MkClosure (irDeclName decl) ns
 closureConvert a@(App i t1 t2) = do 
-    clo <- gets lastClosure
     t1' <- closureConvert t1
     t2' <- closureConvert t2
     return $ IrCall (IrAccess t1' IrFunTy 0) [t1',t2'] (ty2irty $ getTy a)
@@ -41,7 +40,7 @@ closureConvert (BinaryOp _ op t1 t2) = do
 closureConvert fx@(Fix _ f fty x xty (Sc2 t)) = let ns = getFreeVars fx in do
     decl <- makeBlock fx ns
     modify (\s -> s {idecls = idecls s ++ [decl]})
-    return $ MkClosure (irDeclName decl) (IrVar f (ty2irty fty):ns)
+    return $ MkClosure (irDeclName decl) ns
 closureConvert (IfZ _ c t1 t2) = do
     c' <- closureConvert c
     t1' <- closureConvert t1
@@ -50,26 +49,29 @@ closureConvert (IfZ _ c t1 t2) = do
 closureConvert (Let _ name ty t1 t2) = do
     t1' <- closureConvert t1
     ity <- irTy t1'
-    modify (\s -> s {lastVar = IrVar name ity: lastVar s})
     t2' <- closureConvert (open name t2)
     return $ IrLet name ity t1' t2'
 
 makeBlock :: TTerm -> [Ir] -> IR IrDecl
 makeBlock (Lam _ x ty t) ns = do
     n' <- createName
-    modify (\s -> s {lastClosure = "clo" ++ n'})
+    n'' <- createName
+    modify (\s -> s {lastClosure = n''})
     ir <- closureConvert (open x t)
     ity <- irTy ir
-    return $ IrFun n' ity [("clo"++n',IrClo),(x,ty2irty ty)] (putLet ir ns ("clo"++n') 1)
+    return $ IrFun n' ity [(n'',IrClo),(x,ty2irty ty)] (putLet ir ns n'' 1)
 makeBlock (Fix _ f fty x xty t) ns = do
     n' <- createName
-    modify (\s -> s {lastClosure = "clo" ++ n'})
+    n'' <- createName
+    modify (\s -> s {lastClosure = n''})
     ir <- closureConvert (open2 f x t)
     ty <- irTy ir
-    return $ IrFun n' ty [("clo"++n',IrClo),(x,ty2irty xty)] (putLet ir (IrVar f IrClo:ns) ("clo"++n') 1)
+    let body = putLet ir ns n'' 1 in
+        return $ IrFun n' ty [(n'',IrClo),(x,ty2irty xty)] (IrLet f IrClo (IrVar n'' IrClo) body) 
 makeBlock t ns = do
     n' <- createName
-    modify (\s -> s {lastClosure = "clo" ++ n'})
+    n'' <- createName
+    modify (\s -> s {lastClosure = n''})
     ir <- closureConvert t
     ty <- irTy ir
     return $ IrVal n' ty ir
@@ -108,13 +110,24 @@ irTy (IrAccess _ ty _) = return ty
 irTy (IrGlobal n) = getDeclType n
 irTy (IrVar _ ty) = return ty
 
-ir2C2 :: MonadFD4 m => [Decl TTerm] -> m ()
-ir2C2 decls = let names = map declName decls
+ir2C2 :: MonadFD4 m => [Decl TTerm] -> m String
+ir2C2 decls = let names = map declName decls ++ concatMap (getNames . declBody) decls
                   name = freshen names "_f" in do
     (a,irs) <- return $ runIR (mapM_ decl2ir decls) name
-    --printFD4 $ ir2C $ IrDecls (idecls irs)
-    mapM_ (printFD4 . show) (idecls irs)
+    return $ ir2C $ IrDecls (idecls irs)
 
+getNames :: TTerm -> [Name]
+getNames (V _ (Global _)) = []
+getNames (V _ (Bound _)) = []
+getNames (V _ (Free n)) = [n] -- no deberia llegar
+getNames (Const {}) = []
+getNames (Lam _ x _ (Sc1 t)) = x:getNames t
+getNames (App _ t1 t2) = getNames t1 ++ getNames t2
+getNames (Print _ _ t) = getNames t
+getNames (BinaryOp _ _ t1 t2) = getNames t1 ++ getNames t2
+getNames (IfZ _ c t1 t2) = getNames c ++ getNames t1 ++ getNames t2 
+getNames (Fix _ f _ x _ (Sc2 t)) = f:x:getNames t
+getNames (Let _ x _ t1 (Sc1 t2)) = x:(getNames t1 ++ getNames t2)  
 
 decl2ir :: Decl TTerm -> IR ()
 decl2ir d = do
