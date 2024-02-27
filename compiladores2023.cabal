@@ -39,6 +39,7 @@ executable compiladores2023
         TypeChecker
         CEKMachine
         Bytecompile
+        Bytecompile_8
         Optimizer
         C
         IR
@@ -68,5 +69,6 @@ executable compiladores2023
         , prettyprinter
         , prettyprinter-ansi-terminal
         , text
+        , utf8-string
     hs-source-dirs:   src
     default-language: Haskell2010

@@ -55,7 +55,7 @@ import MonadFD4
       runFD4, runFD4Prof, FD4Prof )
 import CEKMachine(evalCEK)
 import TypeChecker ( tc, tcDecl )
-import Bytecompile (bytecompileModule, bcWrite, bcRead, runBC)
+import Bytecompile_8 (bytecompileModule, bcWrite, bcRead, runBC)
 import Optimizer (optimize)
 import ClosureConvert (ir2C2)
 import System.FilePath (dropExtension)
@@ -182,7 +182,7 @@ compile f = do
     case m of 
       Bytecompile -> do gdecl <- gets glb
                         bcode <- bytecompileModule (reverse gdecl)
-                        liftIO $ bcWrite bcode (dropExtension f ++ ".bc32")
+                        liftIO $ bcWrite bcode (dropExtension f ++ ".bc8")
                         setInter i
       CC -> do gdecl <- gets glb
                code <- ir2C2 (reverse gdecl)
