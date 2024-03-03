@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -56,7 +57,7 @@ enum {
  * involucran saltos y la construcción de clausuras.
  */
 typedef uint32_t *code;
-
+typedef uint8_t *code8;
 /*
  * Un entorno es una lista enlazada de valores. Representan los valores
  * para cada variable de de Bruijn en el "término" que evaluamos.
@@ -379,6 +380,67 @@ void run(code init_c)
 	}
 }
 
+uint32_t decodeInt(code8 code) {
+	uint32_t res = 0;
+	res |= code[3] << 24;
+	res |= code[2] << 16;
+	res |= code[1] << 8;
+	res |= code[0];
+	return res;
+}
+
+void decodeString(code8 *codeptr8,code *codeptr) {
+	size_t bytes = strlen(*codeptr8);	// Tamaño en bytes del string UTF-8
+	size_t actual_size = mbstowcs(*codeptr,*codeptr8,bytes);
+	
+	*codeptr8 += bytes + 1;
+	*codeptr += actual_size + 1;
+}
+
+code code8ToCode32(code8 code8, size_t size) {
+	code codeptr = GC_malloc(size * sizeof(uint32_t));
+	code init_ptr = codeptr;
+	int finished = 0;
+
+	while (!finished) {
+		switch (*code8) {
+			case STOP: {
+				*codeptr = (uint32_t)*code8++;
+				finished = 1;
+				break;
+			}
+			case RETURN: 
+			case ADD:
+			case SUB:
+			case FIX:
+			case SHIFT:
+			case DROP:
+			case CALL:
+			case TAILCALL:
+			case PRINTN: {
+				*codeptr++ = (uint32_t)*code8++;
+				break;
+			}
+			case CONST:
+			case ACCESS:
+			case FUNCTION: 
+			case JUMP:
+			case CJUMP: {
+				*codeptr++ = (uint32_t)*code8++;
+				*codeptr++ = decodeInt(code8);
+				code8 += 4;
+				break;
+			}
+			case PRINT:{
+				decodeString(&code8,&codeptr);
+				break;
+			}	
+		}
+	}
+	return init_ptr;
+}
+
+
 /*
  * main simplemente llama al intérprete sobre el código que hay en el
  * archivo argv[1]. Para ser más piolas, en vez de hacer malloc, leer
@@ -391,6 +453,7 @@ void run(code init_c)
 int main(int argc, char **argv)
 {
 	code codeptr;
+	code8 codeptr8;
 	struct stat sb;
 	int fd;
 
@@ -414,9 +477,11 @@ int main(int argc, char **argv)
 		quit("fstat");
 
 	/* Mapeamos el archivo en memoria */
-	codeptr = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-	if (!codeptr)
+	codeptr8 = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	if (!codeptr8)
 		quit("mmap");
+
+	codeptr = code8ToCode32(codeptr8,sb.st_size);
 
 	/* Llamamos a la máquina */
 	run(codeptr);

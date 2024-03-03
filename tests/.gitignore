@@ -1,4 +1,5 @@
 *.c
+*.bc32
 *.bc8
 *.check*
 *.actual_out*
