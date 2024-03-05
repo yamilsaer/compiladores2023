@@ -53,6 +53,7 @@ executable compiladores2023
         -fwarn-missing-signatures 
         -fwarn-name-shadowing 
         -fwarn-incomplete-patterns
+        -O2
     -- other-extensions:
     build-depends:    
           base >=4.7

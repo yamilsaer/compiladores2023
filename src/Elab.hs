@@ -102,7 +102,10 @@ typeElab p (SVarTy n) = do
   ty <- lookupTyDecl n 
   case ty of
     Nothing -> failPosFD4 p ("El tipo " ++ n ++ " no existe.")
-    Just t -> return t
+    Just t -> return (addTyName t n)
+  where
+    addTyName (NatTy _) name = NatTy (Just name)
+    addTyName (FunTy _ t1 t2) name = FunTy (Just name) t1 t2 
 
 elabSDecl :: MonadFD4 m => Pos -> Bool -> [(Name,STy)] -> STerm -> m (SDecl STerm STy)
 elabSDecl i _ [] _ = failPosFD4 i "Error inesperado."

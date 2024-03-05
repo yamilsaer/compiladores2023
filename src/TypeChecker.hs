@@ -103,6 +103,17 @@ domCod tt = case getTy tt of
     FunTy _ d c -> return (d, c)
     _         -> typeError tt $ "Se esperaba un tipo función, pero se obtuvo: " ++ ppTy (getTy tt)
 
+putTy :: TTerm -> Ty -> TTerm
+putTy (V (p,_) v) ty = V (p,ty) v
+putTy (Const (p,_) c) ty = Const (p,ty) c
+putTy (Lam (p,_) n t s) ty = Lam (p,ty) n t s
+putTy (App (p,_) t1 t2) ty = App (p,ty)  t1 t2
+putTy (Print (p,_) str t) ty = Print (p,ty) str t
+putTy (BinaryOp (p,_) bop t1 t2) ty = BinaryOp (p,ty) bop t1 t2
+putTy (Fix (p,_) n1 t1 n2 t2 s2) ty = Fix (p,ty) n1 t1 n2 t2 s2
+putTy (IfZ (p,_) t1 t2 t3) ty = IfZ (p,ty) t1 t2 t3
+putTy (Let (p,_) n tty t s) ty = Let (p,ty) n tty t s
+
 -- | 'tcDecl' chequea el tipo de una declaración
 -- y la agrega al entorno de tipado de declaraciones globales
 tcDecl :: MonadFD4 m  => Decl Term -> m (Decl TTerm)
@@ -113,5 +124,5 @@ tcDecl (Decl p n ty t) = do
         Nothing -> do  --no está declarado 
                   s <- get
                   tt <- tc t (tyEnv s)                 
-                  return (Decl p n ty tt)
+                  return (Decl p n ty (putTy tt ty))
         Just _  -> failPosFD4 p $ n ++" ya está declarado"

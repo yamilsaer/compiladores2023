@@ -101,10 +101,10 @@ valueToTerm (C (CFix fty' (v:vs) f fty n ty t)) d = do
 
 evalCEK :: MonadFD4 m => TTerm -> m TTerm
 evalCEK t = do
-      v <- seek t [] []
-      p <- getProfile
-      when p $ do
-        c <- gets count
-        printFD4 $ "Cantidad de operaciones ejecutadas : " ++ show c
-        resetCount
-      valueToTerm v 0
+    v <- seek t [] []
+    p <- getProfile
+    when p $ do
+      c <- gets count
+      printFD4 $ "Cantidad de operaciones ejecutadas : " ++ show c
+      resetCount
+    valueToTerm v 0

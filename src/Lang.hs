@@ -34,7 +34,7 @@ data STm info ty var =
   | SBinaryOp info BinaryOp (STm info ty var) (STm info ty var)
   | SFix info (var, ty) [(var, ty)] (STm info ty var)
   | SIfZ info (STm info ty var) (STm info ty var) (STm info ty var)
-  | SLet Bool info [(var, ty)] (STm info ty var) (STm info ty var)
+  | SLet Bool info [(var, ty)] (STm info ty var) (STm info ty var) -- Bool determina si es una funcion recursiva o no
   deriving (Show, Functor)
 
 data STy =
