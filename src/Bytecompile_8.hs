@@ -94,8 +94,6 @@ pattern JUMP :: Int
 pattern JUMP     = 15
 pattern TAILCALL :: Int
 pattern TAILCALL = 16
--- pattern SDROP :: Int
--- pattern SDROP = 17
 
 pattern NULL_8 :: Word8
 pattern NULL_8 = 0x00
@@ -393,6 +391,5 @@ runBC' (CJUMP:n:bs) e (I m:s) = if m == 0
   then tick >> runBC' bs e s
   else tick >> runBC' (drop n bs) e s
 runBC' (TAILCALL:bs) _ (v:Fun e' bs':s) = tick >> runBC' bs' (v:e') s
---runBC' (SDROP:bs) e (v:s) = tick >> runBC' bs e s
 runBC' (b:_) _ _ = failFD4 $ "Instrucción inválida: " ++ show b
 runBC' _ _ _ = failFD4 "Error inesperado"

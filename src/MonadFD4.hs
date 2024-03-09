@@ -177,11 +177,9 @@ instance MonadFD4 FD4Prof where
     addClos = modify (\s -> s { numClosures = numClosures s + 1 })
 
 -- 'runFD4\'' corre una computación de la mónad 'FD4' en el estado inicial 'Global.initialEnv' 
-runFD4' :: FD4 a -> Conf -> IO (Either Error (a, GlEnv))
-runFD4' c conf =  runExceptT $ runStateT (runReaderT c conf)  initialEnv
 
 runFD4 :: FD4 a -> Conf -> IO (Either Error a)
-runFD4 c conf = fmap fst <$> runFD4' c conf
+runFD4 c conf = fmap fst <$> runExceptT (runStateT (runReaderT c conf)  initialEnv)
 
 runFD4Prof' :: FD4Prof a -> Conf -> IO (Either Error (a, GlEnv))
 runFD4Prof' (FD4Prof c) conf =  runExceptT $ runStateT (runReaderT c conf) initialEnv
