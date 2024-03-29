@@ -210,7 +210,7 @@ bct (IfZ _ c t1 t2) = do
   c' <- bcc c
   t' <- bct t1
   t'' <- bct t2
-  return $ c' ++ [CJUMP,length t'+ 2] ++ t' ++ [JUMP,length t''] ++ t''
+  return $ c' ++ [CJUMP,length t'] ++ t' ++ t''
 bct (Let _ _ _ t1 (Sc1 t2)) = do
   t' <- bcc t1
   t'' <- bct t2
