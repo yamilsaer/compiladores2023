@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms #-}
+ {-# LANGUAGE PatternSynonyms #-}
 
 module Optimizer (optimize)
 where
@@ -260,7 +260,6 @@ termHeuristic (App _ t1 t2) = 1 + termHeuristic t1 + termHeuristic t2
 termHeuristic (IfZ _ c t1 t2) = termHeuristic c + termHeuristic t1 + termHeuristic t2 + 1
 termHeuristic (Fix _ _ _ _ _ (Sc2 t)) = 1 + termHeuristic t
 termHeuristic (Let _ _ _ t1 (Sc1 t2)) = 1 + termHeuristic t1 + termHeuristic t2
-
 
 -- getArgs :: TTerm -> Int -> [Int]
 -- getArgs (Lam _ _ _ (Sc1 t)) = getArgs' t []

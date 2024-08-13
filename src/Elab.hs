@@ -47,7 +47,7 @@ elab' env (SIfZ p c t e) = do
   e' <- elab' env e
   return $ IfZ p c' t' e'
 elab' env (SBinaryOp i o t u) = do
-  t' <- elab' env t 
+  t' <- elab' env t
   u' <- elab' env u
   return $ BinaryOp i o t' u'
 elab' env (SPrint i str Nothing) =

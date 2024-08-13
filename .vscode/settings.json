@@ -2,5 +2,6 @@
     "files.associations": {
         "wchar.h": "c",
         "inttypes.h": "c"
-    }
+    },
+    "makefile.configureOnOpen": false
 }

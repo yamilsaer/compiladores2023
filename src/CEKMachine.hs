@@ -55,6 +55,7 @@ seek (Lam i n ty (Sc1 t)) e ks = tick >> destroy (C (CFun (snd i) e n ty t)) ks
 seek (Fix i f fty n ty (Sc2 t)) e ks = tick >> destroy (C (CFix (snd i) e f fty n ty t)) ks
 seek (Let _ n _ t1 (Sc1 t2)) e ks = tick >> seek t1 e (KLet e n t2:ks)
 
+-- Reemplazo de la sustitución, razón de creación desconocida
 replaceBound :: MonadFD4 m => TTerm -> TTerm -> Int -> m TTerm
 replaceBound v@(V _ (Bound j)) t n = return $ if j == n then t else v
 replaceBound v@(V _ _) _ _ = return v

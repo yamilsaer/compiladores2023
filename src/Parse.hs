@@ -142,7 +142,6 @@ multibinders = do vs <- many1 var
                   ty <- typeP
                   return (map (,ty) vs)
 
-
 binders :: P [(Name, STy)]
 binders = do 
   bs <- many1  (parens multibinders <|> parens binding)

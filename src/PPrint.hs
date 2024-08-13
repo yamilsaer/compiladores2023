@@ -280,7 +280,7 @@ resugarD :: MonadFD4 m => Decl TTerm -> m (SDecl STerm STy)
 resugarD (Decl p n ty t) = do
   t' <- resugarT t
   return $ resugarD' $ SDecl p False [(n,typeToSType ty)] t'
-  
+
 resugarD' :: SDecl STerm STy -> SDecl STerm STy
 resugarD' (SDecl p b [(n,ty)] (SLam _ vs t)) = SDecl p b ((n,lastTy ty):vs) t
 resugarD' sd@(SDecl p False [(f,fty)] (SFix _ (f',fty') vs t)) = if f == f' && fty == fty'
