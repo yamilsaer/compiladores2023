@@ -82,7 +82,8 @@ elab' env (SLet True p [(f,fty),(v,vty)] def body) = do
   return $ Let p f (FunTy Nothing vty' fty') def' (close v body')
 elab' env (SLet True p ((f,fty):(v,vty):vs) def body) = do
   let fty'' = foldr (SFunTy . snd) fty vs
-    in elab' env (SLet True p [(f,fty),(v,vty)] (SLam p vs def) body)
+    in do
+      elab' env (SLet True p [(f,fty''),(v,vty)] (SLam p vs def) body)
 
 mapTypes :: MonadFD4 m => Pos -> [(Name,STy)] -> m [(Name,Ty)]
 mapTypes _ [] = return []

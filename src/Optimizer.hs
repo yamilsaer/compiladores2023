@@ -225,17 +225,23 @@ inline (App i v@(V _ (Global n)) t) ns env = do
                 _ -> let z = freshen ns n
                          zty = snd $ getInfo t in do
                     inline (Let i z zty t (Sc1 decl)) (z:ns) (t:env)
-inline (App i v@(V _ (Bound idx)) t) ns env = let d = env !! idx in
-    if termHeuristic d > COST  || isFix d then do
+inline (App i v@(V _ (Bound idx)) t) ns env = if idx < length env then (
+    let d = env !! idx in
+    if termHeuristic d > COST || isFix d then do
         t' <- inline t ns env
         return $ App i v t'
-    else let t' = getScope d in do
+    else let t' = getScope d in
     case t of
         (V _ _) -> inline (subst t (Sc1 t')) ns env
         (Const _ _) -> inline (subst t (Sc1 t')) ns env
-        _ -> let z = freshen ns "y"
-                 zty = snd $ getInfo t in do
-            inline (Let i z zty t (Sc1 t')) (z:ns) (t:env)
+        _ -> 
+            let z = freshen ns "y"
+                zty = snd $ getInfo t in
+                    inline (Let i z zty t (Sc1 t')) (z:ns) (t:env)
+    ) 
+    else do
+        t' <- inline t ns env
+        return $ App i v t'
 inline (App i t1 t2) ns env = do
     t1' <- inline t1 ns env
     t2' <- inline t2 ns env

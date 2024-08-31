@@ -48,12 +48,11 @@ data StateIr = StateIr {
 
   freshIndex :: Int,
   idecls :: [IrDecl],
-  freshName :: Name,
-  lastClosure :: Name -- Nombre de la ultima clausura
+  freshName :: Name
 }
 
 runIR :: IR a -> Name -> (a,StateIr)
 runIR c n = runState c (initState n)
 
 initState :: Name -> StateIr
-initState n = StateIr 0 [] n ""
+initState = StateIr 0 []
