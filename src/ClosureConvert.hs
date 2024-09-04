@@ -26,8 +26,8 @@ closureConvert f@(Lam _ x ty sc@(Sc1 t)) = do
     let fv = freeVars t
     let irfv = map (IrGlobal . fst) fv
     ir <- closureConvert (open y sc)
-    let decl = IrFun n' ((ty2irty . getTy) t) [(n'',IrClo),(y,ty2irty ty)] (putLet2 ir fv n'' 1)
-    modify (\s -> s {idecls = decl:idecls s})
+    let decl = IrFun n' ((ty2irty . getTy) t) [(n'',IrClo),(y,ty2irty ty)] (putLet ir fv n'' 1)
+    modify (\s -> s {idecls = idecls s ++ [decl]})
     return $ MkClosure n' irfv
 closureConvert a@(App i t1 t2) = do
     let FunTy _ ty1 ty2 = getTy t1 
@@ -53,9 +53,9 @@ closureConvert fx@(Fix _ f fty x xty sc@(Sc2 t)) = do
     let fv = freeVars t
     let irfv = map (IrGlobal . fst) fv
     ir <- closureConvert (open2 f2 x2 sc)
-    let body = putLet2 ir fv n'' 1
+    let body = putLet ir fv n'' 1
     let decl =  IrFun n' (ty2irty $ getTy t) [(n'',IrClo),(x2,ty2irty xty)] (IrLet f2 (ty2irty $ getTy fx) (IrVar n'' IrClo) body) 
-    modify (\s -> s {idecls = decl:idecls s})
+    modify (\s -> s {idecls = idecls s ++ [decl]})
     return $ MkClosure n' irfv
 closureConvert (IfZ _ c t1 t2) = do
     c' <- closureConvert c
@@ -69,14 +69,9 @@ closureConvert (Let _ name ty t1 t2) = do
     return $ IrLet x (ty2irty ty) t1' t2'
 closureConvert v@(V _ (Bound n)) = return $ IrVar "" IrInt -- no deberia llegar
 
-putLet2 :: Ir -> [(Name,Ty)] -> Name -> Int -> Ir
-putLet2 t [] _ _ = t
-putLet2 t ((v,ty):vs) n i = IrLet v (ty2irty ty) (IrAccess (IrVar n IrClo) (ty2irty ty) i) (putLet2 t vs n (i+1))
-
-putLet :: Ir -> [Ir] -> Name -> Int -> Ir
-putLet t (IrVar name ty:xs) n i = IrLet name ty (IrAccess (IrVar n IrClo) ty i) (putLet t xs n (i+1))
-putLet t []  _ _ = t
-putLet _ _ _ _ = undefined
+putLet :: Ir -> [(Name,Ty)] -> Name -> Int -> Ir
+putLet t [] _ _ = t
+putLet t ((v,ty):vs) n i = IrLet v (ty2irty ty) (IrAccess (IrVar n IrClo) (ty2irty ty) i) (putLet t vs n (i+1))
 
 getFreeVars :: TTerm -> [Ir]
 getFreeVars (V _ (Global _)) = []
