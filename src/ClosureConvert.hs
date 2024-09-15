@@ -73,19 +73,6 @@ putLet :: Ir -> [(Name,Ty)] -> Name -> Int -> Ir
 putLet t [] _ _ = t
 putLet t ((v,ty):vs) n i = IrLet v (ty2irty ty) (IrAccess (IrVar n IrClo) (ty2irty ty) i) (putLet t vs n (i+1))
 
-getFreeVars :: TTerm -> [Ir]
-getFreeVars (V _ (Global _)) = []
-getFreeVars (V _ (Bound _)) = []
-getFreeVars v@(V _ (Free n)) = [IrVar n (ty2irty $ getTy v)]
-getFreeVars (Const {}) = []
-getFreeVars (Lam _ _ _ (Sc1 t)) = getFreeVars t
-getFreeVars (App _ t1 t2) = getFreeVars t1 ++ getFreeVars t2
-getFreeVars (Print _ _ t) = getFreeVars t
-getFreeVars (BinaryOp _ _ t1 t2) = getFreeVars t1 ++ getFreeVars t2
-getFreeVars (IfZ _ c t1 t2) = getFreeVars c ++ getFreeVars t1 ++ getFreeVars t2 
-getFreeVars (Fix _ _ _ _ _ (Sc2 t)) = getFreeVars t
-getFreeVars (Let _ _ _ t1 (Sc1 t2)) = getFreeVars t1 ++ getFreeVars t2 
-
 ty2irty :: Ty -> IrTy
 ty2irty (NatTy {}) = IrInt
 ty2irty (FunTy {}) = IrClo

@@ -112,7 +112,7 @@ consPropagation (Let i x xty def (Sc1 body)) = do
         Const i2 c -> let body' = subst (Const i2 c) (Sc1 body) in
             do
             body'' <- consPropagation body'
-            return $ Let i x xty def' (Sc1 body')
+            return $ Let i x xty def' (Sc1 body'')
         t -> do
             body' <- consPropagation body
             return $ Let i x xty def' (Sc1 body')
