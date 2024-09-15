@@ -77,18 +77,6 @@ ty2irty :: Ty -> IrTy
 ty2irty (NatTy {}) = IrInt
 ty2irty (FunTy {}) = IrClo
 
-irTy :: Ir -> IR IrTy
-irTy (IrCall _ _ ty) = return ty
-irTy (IrConst _) = return IrInt
-irTy (IrPrint _ _) = return IrInt
-irTy (IrBinaryOp {}) = return IrInt 
-irTy (IrLet _ _ _ i) = irTy i
-irTy (IrIfZ _ i _) = irTy i
-irTy (MkClosure _ _) = return IrClo
-irTy (IrAccess _ ty _) = return ty
-irTy (IrGlobal n) = getDeclType n
-irTy (IrVar _ ty) = return ty
-
 ir2C2 :: MonadFD4 m => [Decl TTerm] -> m String
 ir2C2 decls = let names = map declName decls ++ concatMap (getNames . declBody) decls
                   name = freshen names "_f" in do
@@ -111,8 +99,7 @@ getNames (Let _ x _ t1 (Sc1 t2)) = x:(getNames t1 ++ getNames t2)
 decl2ir :: Decl TTerm -> IR ()
 decl2ir d = do
     ir <- closureConvert (declBody d)
-    ty <- irTy ir
-    modify (\s -> s {idecls = idecls s ++ [IrVal (declName d) ty ir]}) 
+    modify (\s -> s {idecls = idecls s ++ [IrVal (declName d) (ty2irty $ declTy d) ir]}) 
 
 getDeclType :: Name -> IR IrTy
 getDeclType n = do
